@@ -16,9 +16,26 @@
  *   - Response is NOT SSE — it's a batch JSON format with )]}\' prefix
  */
 
+function log(onLog, level, category, message, data) {
+  if (typeof onLog === 'function') {
+    try {
+      onLog({
+        timestamp: new Date().toISOString(),
+        provider: 'gemini',
+        level,
+        category,
+        message,
+        data,
+      })
+    } catch {
+      // Do not let logger failures interrupt execution
+    }
+  }
+}
+
 // --- Cookie & token helpers ---
 
-async function getCookies() {
+async function getCookies(onLog) {
   const psid = await chrome.cookies.get({
     url: 'https://gemini.google.com/',
     name: '__Secure-1PSID',
@@ -26,6 +43,11 @@ async function getCookies() {
   const psidts = await chrome.cookies.get({
     url: 'https://gemini.google.com/',
     name: '__Secure-1PSIDTS',
+  })
+
+  log(onLog, 'debug', 'COOKIE', 'Retrieved Gemini authentication cookies', {
+    psid,
+    psidts,
   })
 
   if (!psid?.value) {
@@ -39,7 +61,12 @@ async function getCookies() {
   return cookieStr
 }
 
-async function getRequestParams(cookies) {
+async function getRequestParams(cookies, onLog) {
+  log(onLog, 'info', 'NETWORK_REQUEST', 'Requesting gemini.google.com to extract anti-CSRF token and build label', {
+    url: 'https://gemini.google.com/',
+    headers: { Cookie: cookies },
+  })
+
   const resp = await fetch('https://gemini.google.com/', {
     headers: { Cookie: cookies },
   })
@@ -47,6 +74,13 @@ async function getRequestParams(cookies) {
 
   const snlm0eMatch = text.match(/"SNlM0e":\s*"([^"]+)"/)
   const cfb2hMatch = text.match(/"cfb2h":\s*"([^"]+)"/)
+
+  log(onLog, 'info', 'TOKEN_EXTRACT', 'Parsed SNlM0e and cfb2h from page HTML', {
+    snlm0eFound: Boolean(snlm0eMatch),
+    snlm0e: snlm0eMatch?.[1] || null,
+    cfb2hFound: Boolean(cfb2hMatch),
+    cfb2h: cfb2hMatch?.[1] || null,
+  })
 
   if (!snlm0eMatch) {
     throw new Error(
@@ -156,45 +190,82 @@ function cleanGeminiText(text) {
  * @param {object} [options]
  * @param {(chunk: string) => void} [options.onChunk] - called once with the full answer
  * @param {AbortSignal} [options.signal]
+ * @param {(entry: object) => void} [options.onLog] - called with diagnostic log events
  * @returns {Promise<string>} answer text
  */
-export async function sendPrompt(prompt, { onChunk, signal } = {}) {
-  const cookies = await getCookies()
-  const { at, bl } = await getRequestParams(cookies)
+export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
+  log(onLog, 'info', 'PROMPT_START', 'Starting Gemini prompt execution', { prompt })
 
-  const url =
-    'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?' +
-    new URLSearchParams({ bl, rt: 'c', _reqid: '0' })
+  try {
+    const cookies = await getCookies(onLog)
+    const { at, bl } = await getRequestParams(cookies, onLog)
 
-  const body = new URLSearchParams({
-    at,
-    'f.req': JSON.stringify([
-      null,
-      `[[${JSON.stringify(prompt)}],null,${JSON.stringify(['', '', ''])}]`,
-    ]),
-  })
+    const url =
+      'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?' +
+      new URLSearchParams({ bl, rt: 'c', _reqid: '0' })
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    credentials: 'include',
-    signal,
-    headers: { Cookie: cookies },
-    body,
-  })
+    const body = new URLSearchParams({
+      at,
+      'f.req': JSON.stringify([
+        null,
+        `[[${JSON.stringify(prompt)}],null,${JSON.stringify(['', '', ''])}]`,
+      ]),
+    })
 
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => '')
-    throw new Error(`Gemini HTTP ${resp.status}: ${errText.slice(0, 200)}`)
+    const bodyObj = Object.fromEntries(body.entries())
+    log(onLog, 'info', 'NETWORK_REQUEST', 'Dispatching request to StreamGenerate endpoint', {
+      url,
+      headers: { Cookie: cookies },
+      body: bodyObj,
+    })
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      signal,
+      headers: { Cookie: cookies },
+      body,
+    })
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '')
+      log(onLog, 'error', 'NETWORK_RESPONSE', `Gemini HTTP ${resp.status} error`, {
+        status: resp.status,
+        body: errText,
+      })
+      throw new Error(`Gemini HTTP ${resp.status}: ${errText.slice(0, 200)}`)
+    }
+
+    const data = await resp.text()
+    log(onLog, 'info', 'NETWORK_RESPONSE', `StreamGenerate responded with ${resp.status}`, {
+      status: resp.status,
+      bytesReceived: data.length,
+      rawPayloadPreview: data.slice(0, 1000),
+    })
+
+    const rawAnswer = parseResponse(data)
+    log(onLog, 'debug', 'PARSED_RAW', 'Extracted raw answer candidate from payload', {
+      rawAnswerLength: rawAnswer.length,
+      rawAnswerPreview: rawAnswer.slice(0, 300),
+    })
+
+    const answer = cleanGeminiText(rawAnswer)
+    log(onLog, 'debug', 'CLEANED_TEXT', 'Cleaned answer text', {
+      answerLength: answer.length,
+    })
+
+    if (!answer) {
+      log(onLog, 'error', 'EMPTY_RESPONSE', 'Gemini returned an empty response after cleaning', {
+        rawPayload: data,
+      })
+      throw new Error('Gemini: Empty response. Session may have expired.')
+    }
+
+    if (onChunk) onChunk(answer)
+    log(onLog, 'info', 'PROMPT_COMPLETE', 'Gemini completed successfully', { answerLength: answer.length })
+    return answer
+  } catch (err) {
+    log(onLog, 'error', 'ERROR', `Gemini failed: ${err.message || String(err)}`, { stack: err.stack })
+    throw err
   }
-
-  const data = await resp.text()
-  const rawAnswer = parseResponse(data)
-  const answer = cleanGeminiText(rawAnswer)
-
-  if (!answer) {
-    throw new Error('Gemini: Empty response. Session may have expired.')
-  }
-
-  if (onChunk) onChunk(answer)
-  return answer
 }

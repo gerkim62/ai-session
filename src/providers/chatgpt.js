@@ -25,36 +25,79 @@ function getSha3() {
   return { create: () => ({ update: () => ({ hex: () => 'f'.repeat(128) }) }) }
 }
 
+function log(onLog, level, category, message, data) {
+  if (typeof onLog === 'function') {
+    try {
+      onLog({
+        timestamp: new Date().toISOString(),
+        provider: 'chatgpt',
+        level,
+        category,
+        message,
+        data,
+      })
+    } catch {
+      // Do not let logger failures interrupt execution
+    }
+  }
+}
+
 // --- Cookie / Token helpers ---
 
-async function getCookieValue(url, name) {
+async function getCookieValue(url, name, onLog) {
   const cookie = await chrome.cookies.get({ url, name })
+  log(onLog, 'debug', 'COOKIE', `Queried cookie "${name}" for ${url}`, cookie)
   return cookie?.value || null
 }
 
-async function getAccessToken() {
+async function getAccessToken(onLog) {
   const cookies = await chrome.cookies.getAll({ url: 'https://chatgpt.com/' })
+  log(onLog, 'debug', 'COOKIE', 'Retrieved all cookies for https://chatgpt.com/', cookies)
   const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ')
+
+  const reqHeaders = { ...(cookieStr && { Cookie: cookieStr }) }
+  log(onLog, 'info', 'NETWORK_REQUEST', 'Fetching ChatGPT session token', {
+    url: 'https://chatgpt.com/api/auth/session',
+    headers: reqHeaders,
+  })
 
   const resp = await fetch('https://chatgpt.com/api/auth/session', {
     credentials: 'include',
-    headers: { ...(cookieStr && { Cookie: cookieStr }) },
+    headers: reqHeaders,
   })
+
+  log(onLog, 'info', 'NETWORK_RESPONSE', `Session endpoint responded with status ${resp.status}`, {
+    status: resp.status,
+    statusText: resp.statusText,
+  })
+
   if (resp.status === 403) throw new Error('ChatGPT: Cloudflare block. Try opening chatgpt.com in a tab first.')
   const data = await resp.json().catch(() => ({}))
+  log(onLog, 'debug', 'AUTH', 'Parsed session response data', data)
   if (!data.accessToken) throw new Error('ChatGPT: Not logged in. Please log in at https://chatgpt.com')
   return data.accessToken
 }
 
-async function getRequirements(accessToken) {
+async function getRequirements(accessToken, onLog) {
+  const reqHeaders = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+  }
+  log(onLog, 'info', 'NETWORK_REQUEST', 'Requesting sentinel chat-requirements', {
+    url: 'https://chatgpt.com/backend-api/sentinel/chat-requirements',
+    headers: reqHeaders,
+  })
+
   const resp = await fetch('https://chatgpt.com/backend-api/sentinel/chat-requirements', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers: reqHeaders,
   })
-  return resp.json()
+  const data = await resp.json().catch(() => ({}))
+  log(onLog, 'info', 'NETWORK_RESPONSE', 'Received sentinel requirements', {
+    status: resp.status,
+    body: data,
+  })
+  return data
 }
 
 // --- Proof-of-Work solver ---
@@ -156,54 +199,61 @@ function cleanChatGPTText(text) {
  * @param {object} [options]
  * @param {(chunk: string) => void} [options.onChunk] - called with accumulated answer text
  * @param {AbortSignal} [options.signal]
+ * @param {(entry: object) => void} [options.onLog] - called with diagnostic log events
  * @returns {Promise<string>} final answer text
  */
-export async function sendPrompt(prompt, { onChunk, signal } = {}) {
-  const accessToken = await getAccessToken()
+export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
+  log(onLog, 'info', 'PROMPT_START', 'Starting ChatGPT prompt execution', { prompt })
 
-  const requirements = await getRequirements(accessToken).catch(() => null)
+  try {
+    const accessToken = await getAccessToken(onLog)
 
-  let proofToken = null
-  if (requirements?.proofofwork?.required) {
-    proofToken = generateProofToken(
-      requirements.proofofwork.seed,
-      requirements.proofofwork.difficulty,
-    )
-  }
+    const requirements = await getRequirements(accessToken, onLog).catch((err) => {
+      log(onLog, 'warn', 'REQUIREMENTS_ERROR', 'Failed to retrieve requirements; proceeding without', { error: err.message })
+      return null
+    })
 
-  const oaiDeviceId = await getCookieValue('https://chatgpt.com/', 'oai-did')
-  const cookies = await chrome.cookies.getAll({ url: 'https://chatgpt.com/' })
-  const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ')
+    let proofToken = null
+    if (requirements?.proofofwork?.required) {
+      log(onLog, 'info', 'POW_START', 'Starting Proof-of-Work puzzle', {
+        seed: requirements.proofofwork.seed,
+        difficulty: requirements.proofofwork.difficulty,
+      })
+      proofToken = generateProofToken(
+        requirements.proofofwork.seed,
+        requirements.proofofwork.difficulty,
+      )
+      log(onLog, 'info', 'POW_SOLVED', 'Proof-of-Work solved', { proofToken })
+    }
 
-  const messageId = generateUUID()
-  const parentMessageId = generateUUID()
+    const oaiDeviceId = await getCookieValue('https://chatgpt.com/', 'oai-did', onLog)
+    const cookies = await chrome.cookies.getAll({ url: 'https://chatgpt.com/' })
+    const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ')
 
-  const url = 'https://chatgpt.com/backend-api/conversation'
-  const body = {
-    action: 'next',
-    messages: [
-      {
-        id: messageId,
-        author: { role: 'user' },
-        content: { content_type: 'text', parts: [prompt] },
-      },
-    ],
-    conversation_mode: { kind: 'primary_assistant' },
-    force_paragen: false,
-    force_rate_limit: false,
-    suggestions: [],
-    model: 'auto',
-    parent_message_id: parentMessageId,
-    timezone_offset_min: new Date().getTimezoneOffset(),
-    history_and_training_disabled: true,
-  }
+    const messageId = generateUUID()
+    const parentMessageId = generateUUID()
 
-  let answer = ''
+    const url = 'https://chatgpt.com/backend-api/conversation'
+    const body = {
+      action: 'next',
+      messages: [
+        {
+          id: messageId,
+          author: { role: 'user' },
+          content: { content_type: 'text', parts: [prompt] },
+        },
+      ],
+      conversation_mode: { kind: 'primary_assistant' },
+      force_paragen: false,
+      force_rate_limit: false,
+      suggestions: [],
+      model: 'auto',
+      parent_message_id: parentMessageId,
+      timezone_offset_min: new Date().getTimezoneOffset(),
+      history_and_training_disabled: true,
+    }
 
-  await fetchSSE(url, {
-    method: 'POST',
-    signal,
-    headers: {
+    const reqHeaders = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
       ...(cookieStr && { Cookie: cookieStr }),
@@ -211,25 +261,57 @@ export async function sendPrompt(prompt, { onChunk, signal } = {}) {
       ...(proofToken && { 'Openai-Sentinel-Proof-Token': proofToken }),
       ...(oaiDeviceId && { 'Oai-Device-Id': oaiDeviceId }),
       'Oai-Language': 'en-US',
-    },
-    body: JSON.stringify(body),
-    onMessage(message) {
-      if (message.trim() === '[DONE]') return
-      try {
-        const data = JSON.parse(message)
-        const text = data.message?.content?.parts?.[0]
-        if (typeof text === 'string' && data.message?.content?.content_type === 'text') {
-          answer = cleanChatGPTText(text)
-          if (onChunk) onChunk(answer)
-        }
-      } catch {
-        // ignore parse errors on intermediate chunks
-      }
-    },
-    onError(err) {
-      throw err
-    },
-  })
+    }
 
-  return answer
+    log(onLog, 'info', 'NETWORK_REQUEST', 'Dispatching conversation request to /backend-api/conversation', {
+      url,
+      headers: reqHeaders,
+      body,
+    })
+
+    let answer = ''
+
+    await fetchSSE(url, {
+      method: 'POST',
+      signal,
+      headers: reqHeaders,
+      body: JSON.stringify(body),
+      onMessage(message) {
+        log(onLog, 'debug', 'SSE_RAW', 'Raw SSE message event', { raw: message })
+        if (message.trim() === '[DONE]') {
+          log(onLog, 'info', 'SSE_DONE', 'Received [DONE] sentinel')
+          return
+        }
+        try {
+          const data = JSON.parse(message)
+          const text = data.message?.content?.parts?.[0]
+          if (typeof text === 'string' && data.message?.content?.content_type === 'text') {
+            answer = cleanChatGPTText(text)
+            log(onLog, 'debug', 'STREAM', 'Accumulated stream text', { answer })
+            if (onChunk) onChunk(answer)
+          }
+        } catch (parseErr) {
+          log(onLog, 'warn', 'SSE_PARSE_WARN', 'Failed to parse intermediate SSE message as JSON', {
+            raw: message,
+            error: parseErr.message,
+          })
+        }
+      },
+      onError(err) {
+        log(onLog, 'error', 'SSE_ERROR', 'Error occurred during SSE streaming', {
+          error: err.message,
+          stack: err.stack,
+        })
+        throw err
+      },
+    })
+
+    log(onLog, 'info', 'PROMPT_COMPLETE', 'ChatGPT stream finished successfully', { answer })
+    return answer
+  } catch (err) {
+    log(onLog, 'error', 'ERROR', `ChatGPT failed: ${err.message || String(err)}`, {
+      stack: err.stack,
+    })
+    throw err
+  }
 }

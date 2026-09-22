@@ -222,6 +222,359 @@
     .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
     .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
+    /* --- Debug Widget & Drawer --- */
+    .debug-fab {
+      position: fixed;
+      bottom: 20px;
+      right: 24px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 9999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+    .debug-fab:hover {
+      border-color: var(--text-dim);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+    .debug-fab.active {
+      border-color: var(--accent-chatgpt);
+      box-shadow: 0 0 16px rgba(16, 163, 127, 0.3);
+    }
+    .debug-fab-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.2s;
+    }
+    .debug-fab.active .debug-fab-dot {
+      background: var(--accent-chatgpt);
+      box-shadow: 0 0 8px var(--accent-chatgpt);
+    }
+    .debug-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 10px;
+      background: var(--border);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .debug-fab.active .debug-badge {
+      background: rgba(16, 163, 127, 0.25);
+      color: #6ee7b7;
+    }
+
+    .debug-drawer {
+      position: fixed;
+      bottom: 74px;
+      right: 24px;
+      width: 720px;
+      max-width: calc(100vw - 48px);
+      height: 540px;
+      max-height: calc(100vh - 120px);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      z-index: 99;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(16px) scale(0.98);
+      transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .debug-drawer.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+
+    .debug-drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #14141d;
+    }
+    .debug-title-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .debug-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Toggle switch */
+    .switch-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-dim);
+      user-select: none;
+    }
+    .switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      display: inline-block;
+    }
+    .switch input { display: none; }
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--border);
+      border-radius: 20px;
+      transition: 0.2s;
+    }
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .switch input:checked + .switch-slider {
+      background: var(--accent-chatgpt);
+    }
+    .switch input:checked + .switch-slider:before {
+      transform: translateX(16px);
+    }
+
+    .debug-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-action {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-action:hover {
+      background: var(--border);
+      border-color: var(--text-dim);
+    }
+    .btn-action-primary {
+      background: linear-gradient(135deg, var(--accent-chatgpt), #0d8a6a);
+      border: none;
+      color: #fff;
+    }
+    .btn-action-primary:hover {
+      opacity: 0.9;
+    }
+    .btn-close-drawer {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .btn-close-drawer:hover {
+      color: var(--text);
+      background: var(--border);
+    }
+
+    .debug-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 18px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.15);
+      font-size: 12px;
+    }
+    .debug-filters {
+      display: flex;
+      gap: 6px;
+    }
+    .filter-pill {
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-pill:hover {
+      color: var(--text);
+      border-color: var(--text-dim);
+    }
+    .filter-pill.active {
+      background: var(--border);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .debug-stat {
+      color: var(--text-dim);
+      font-size: 11px;
+    }
+
+    .debug-log-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+    }
+    .debug-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-dim);
+      text-align: center;
+      gap: 6px;
+      font-style: italic;
+    }
+
+    .log-entry {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 6px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: border-color 0.15s;
+    }
+    .log-entry:hover {
+      border-color: var(--border);
+    }
+    .log-entry.level-error {
+      border-left: 3px solid var(--error);
+      background: rgba(239, 68, 68, 0.05);
+    }
+    .log-entry.level-warn {
+      border-left: 3px solid var(--accent-claude);
+      background: rgba(217, 119, 6, 0.05);
+    }
+    .log-entry.level-info {
+      border-left: 3px solid var(--accent-gemini);
+    }
+    .log-entry.level-debug {
+      border-left: 3px solid #64748b;
+    }
+
+    .log-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+    .log-time {
+      color: var(--text-dim);
+    }
+    .log-provider {
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .log-provider.chatgpt { background: var(--accent-chatgpt-bg); color: var(--accent-chatgpt); }
+    .log-provider.claude { background: var(--accent-claude-bg); color: var(--accent-claude); }
+    .log-provider.gemini { background: var(--accent-gemini-bg); color: var(--accent-gemini); }
+
+    .log-category {
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .log-level {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .log-level.error { color: var(--error); }
+    .log-level.warn { color: var(--accent-claude); }
+    .log-level.info { color: var(--accent-gemini); }
+    .log-level.debug { color: #94a3b8; }
+
+    .log-msg {
+      color: var(--text);
+      word-break: break-word;
+      line-height: 1.4;
+    }
+    .log-details {
+      margin-top: 4px;
+    }
+    .log-details summary {
+      color: var(--text-dim);
+      font-size: 11px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .log-details summary:hover {
+      color: var(--text);
+    }
+    .log-details pre {
+      background: #09090d;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 6px;
+      max-height: 240px;
+      overflow-y: auto;
+      font-size: 11px;
+      color: #93c5fd;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
     /* --- Scrollbar --- */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -282,6 +635,52 @@
         <span class="col-status" id="status-gemini">idle</span>
       </div>
       <div class="col-body empty" id="body-gemini">Waiting for prompt...</div>
+    </div>
+  </div>
+
+  <!-- Floating Debug Action Button (FAB) -->
+  <button id="btn-debug-fab" class="debug-fab" title="Toggle Run I/O Debug Console">
+    <span class="debug-fab-dot"></span>
+    🐞 Debug
+    <span id="debug-badge" class="debug-badge">0</span>
+  </button>
+
+  <!-- Slide-out Debug Overlay Drawer -->
+  <div id="debug-drawer" class="debug-drawer">
+    <div class="debug-drawer-header">
+      <div class="debug-title-area">
+        <span class="debug-title">🐞 Run I/O Console</span>
+        <label class="switch-wrap">
+          <span class="switch">
+            <input type="checkbox" id="debug-toggle">
+            <span class="switch-slider"></span>
+          </span>
+          <span id="debug-toggle-status">Debug: OFF</span>
+        </label>
+      </div>
+      <div class="debug-actions">
+        <button id="btn-debug-clear" class="btn-action" title="Clear all in-memory logs">Clear</button>
+        <button id="btn-debug-download" class="btn-action btn-action-primary" title="Export logs as JSON">Download JSON</button>
+        <button id="btn-debug-close" class="btn-close-drawer" title="Close drawer">✕</button>
+      </div>
+    </div>
+
+    <div class="debug-toolbar">
+      <div class="debug-filters">
+        <button class="filter-pill active" data-filter="all">All</button>
+        <button class="filter-pill" data-filter="chatgpt">ChatGPT</button>
+        <button class="filter-pill" data-filter="claude">Claude</button>
+        <button class="filter-pill" data-filter="gemini">Gemini</button>
+        <button class="filter-pill" data-filter="error">Errors</button>
+      </div>
+      <div id="debug-stats" class="debug-stat">0 events</div>
+    </div>
+
+    <div id="debug-log-list" class="debug-log-list">
+      <div class="debug-empty">
+        <span>No debug logs captured yet.</span>
+        <span>Turn Debug Mode <strong>ON</strong> and send a prompt to inspect live I/O.</span>
+      </div>
     </div>
   </div>
 

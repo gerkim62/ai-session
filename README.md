@@ -95,6 +95,21 @@ await sendPrompt('claude', "Summarize this article", {
 await gemini.sendPrompt("Hello Gemini", { onChunk: (text) => console.log(text) })
 ```
 
+### 3. Diagnostic Debug Logging (`onLog`)
+Every `sendPrompt` accepts an optional `onLog` callback to trace raw HTTP requests, cookies, PoW puzzle solving, and streaming events in real time:
+
+```javascript
+import { sendPrompt } from 'ai-session-free'
+
+await sendPrompt('chatgpt', "Hello", {
+  onChunk: (chunk) => console.log(chunk),
+  onLog: (entry) => {
+    // entry: { timestamp, provider, level, category, message, data }
+    console.log(`[${entry.category}] ${entry.message}`, entry.data)
+  }
+})
+```
+
 ---
 
 ## Required Extension Permissions

@@ -15,13 +15,27 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener(async (msg) => {
     if (msg.type !== 'SEND_PROMPT') return
 
-    const { provider: providerName, prompt, requestId } = msg
+    const { provider: providerName, prompt, requestId, debug } = msg
     const controller = new AbortController()
     activeRequests.set(requestId, controller)
 
     try {
       await sendPrompt(providerName, prompt, {
         signal: controller.signal,
+        onLog: debug
+          ? (entry) => {
+              try {
+                port.postMessage({
+                  type: 'DEBUG_LOG',
+                  requestId,
+                  provider: providerName,
+                  entry,
+                })
+              } catch {
+                // Port disconnected
+              }
+            }
+          : undefined,
         onChunk: (chunk) => {
           try {
             port.postMessage({

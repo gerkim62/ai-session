@@ -14,14 +14,32 @@
 
 import { fetchSSE } from '../utils/sse-parser.js'
 
+function log(onLog, level, category, message, data) {
+  if (typeof onLog === 'function') {
+    try {
+      onLog({
+        timestamp: new Date().toISOString(),
+        provider: 'claude',
+        level,
+        category,
+        message,
+        data,
+      })
+    } catch {
+      // Do not let logger failures interrupt execution
+    }
+  }
+}
+
 // --- Helpers ---
 
 function uuid() {
   return crypto.randomUUID()
 }
 
-async function getClaudeAuth() {
+async function getClaudeAuth(onLog) {
   const cookies = await chrome.cookies.getAll({ url: 'https://claude.ai/' })
+  log(onLog, 'debug', 'COOKIE', 'Retrieved all cookies for https://claude.ai/', cookies)
   const sessionCookie = cookies.find((c) => c.name === 'sessionKey')
   if (!sessionCookie?.value) {
     throw new Error('Claude: Not logged in. Please log in at https://claude.ai')
@@ -38,56 +56,80 @@ function makeHeaders(cookieStr) {
   }
 }
 
-async function getOrganizationId(cookieStr) {
+async function getOrganizationId(cookieStr, onLog) {
+  const headers = makeHeaders(cookieStr)
+  log(onLog, 'info', 'NETWORK_REQUEST', 'Fetching Claude organizations', {
+    url: 'https://claude.ai/api/organizations',
+    headers,
+  })
+
   const resp = await fetch('https://claude.ai/api/organizations', {
     credentials: 'include',
-    headers: makeHeaders(cookieStr),
+    headers,
   })
   if (!resp.ok) {
     const errText = await resp.text().catch(() => '')
+    log(onLog, 'error', 'NETWORK_RESPONSE', `Claude organizations failed with HTTP ${resp.status}`, {
+      status: resp.status,
+      body: errText,
+    })
     throw new Error(`Claude organizations HTTP ${resp.status}: ${errText.slice(0, 200)}`)
   }
   const text = await resp.text()
   if (text.includes('available in certain regions')) {
+    log(onLog, 'error', 'REGION_BLOCK', 'Claude region restriction detected', { text })
     throw new Error('Claude: Not available in your region')
   }
   const orgs = JSON.parse(text)
+  log(onLog, 'info', 'NETWORK_RESPONSE', 'Retrieved Claude organizations list', orgs)
   if (!orgs?.length) throw new Error('Claude: No organizations found')
   return orgs[0].uuid
 }
 
-async function createConversation(orgId, cookieStr, signal) {
-  const resp = await fetch(
-    `https://claude.ai/api/organizations/${orgId}/chat_conversations`,
-    {
-      method: 'POST',
-      credentials: 'include',
-      headers: makeHeaders(cookieStr),
-      signal,
-      body: JSON.stringify({ name: '', uuid: uuid() }),
-    },
-  )
+async function createConversation(orgId, cookieStr, signal, onLog) {
+  const url = `https://claude.ai/api/organizations/${orgId}/chat_conversations`
+  const headers = makeHeaders(cookieStr)
+  const body = { name: '', uuid: uuid() }
+
+  log(onLog, 'info', 'NETWORK_REQUEST', 'Creating temporary chat conversation', {
+    url,
+    headers,
+    body,
+  })
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers,
+    signal,
+    body: JSON.stringify(body),
+  })
   if (!resp.ok) {
     const errText = await resp.text().catch(() => '')
+    log(onLog, 'error', 'NETWORK_RESPONSE', `Failed creating conversation with HTTP ${resp.status}`, {
+      status: resp.status,
+      body: errText,
+    })
     throw new Error(`Claude createConversation HTTP ${resp.status}: ${errText.slice(0, 200)}`)
   }
   const data = await resp.json()
+  log(onLog, 'info', 'NETWORK_RESPONSE', 'Created temporary conversation', data)
   if (!data?.uuid) throw new Error('Claude: Failed to create conversation')
   return data.uuid
 }
 
-async function deleteConversation(orgId, convoId, cookieStr) {
+async function deleteConversation(orgId, convoId, cookieStr, onLog) {
+  const url = `https://claude.ai/api/organizations/${orgId}/chat_conversations/${convoId}`
+  log(onLog, 'info', 'CLEANUP', 'Deleting temporary conversation', { url })
   try {
-    await fetch(
-      `https://claude.ai/api/organizations/${orgId}/chat_conversations/${convoId}`,
-      {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: makeHeaders(cookieStr),
-      },
-    )
-  } catch {
-    // best-effort cleanup
+    const resp = await fetch(url, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: makeHeaders(cookieStr),
+    })
+    log(onLog, 'info', 'CLEANUP_RESPONSE', `Delete conversation HTTP ${resp.status}`)
+  } catch (err) {
+    log(onLog, 'warn', 'CLEANUP_ERROR', 'Failed to delete temporary conversation', { error: err.message })
   }
 }
 
@@ -99,16 +141,24 @@ async function deleteConversation(orgId, convoId, cookieStr) {
  * @param {object} [options]
  * @param {(chunk: string) => void} [options.onChunk] - called with accumulated answer text
  * @param {AbortSignal} [options.signal]
+ * @param {(entry: object) => void} [options.onLog] - called with diagnostic log events
  * @returns {Promise<string>} final answer text
  */
-export async function sendPrompt(prompt, { onChunk, signal } = {}) {
-  const { cookieStr } = await getClaudeAuth()
-  const orgId = await getOrganizationId(cookieStr)
-  const convoId = await createConversation(orgId, cookieStr, signal)
+export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
+  log(onLog, 'info', 'PROMPT_START', 'Starting Claude prompt execution', { prompt })
 
-  let fullResponse = ''
+  let orgId = null
+  let convoId = null
+  let cookieStr = null
 
   try {
+    const auth = await getClaudeAuth(onLog)
+    cookieStr = auth.cookieStr
+    orgId = await getOrganizationId(cookieStr, onLog)
+    convoId = await createConversation(orgId, cookieStr, signal, onLog)
+
+    let fullResponse = ''
+
     const url = `https://claude.ai/api/organizations/${orgId}/chat_conversations/${convoId}/completion`
 
     // IMPORTANT: model is intentionally omitted to avoid "model_not_allowed" errors.
@@ -119,20 +169,30 @@ export async function sendPrompt(prompt, { onChunk, signal } = {}) {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
     }
 
+    const headers = makeHeaders(cookieStr)
+    log(onLog, 'info', 'NETWORK_REQUEST', 'Dispatching completion request to Claude', {
+      url,
+      headers,
+      body,
+    })
+
     await fetchSSE(url, {
       method: 'POST',
       credentials: 'include',
       signal,
-      headers: makeHeaders(cookieStr),
+      headers,
       body: JSON.stringify(body),
       onMessage(message) {
+        log(onLog, 'debug', 'SSE_RAW', 'Raw Claude SSE chunk', { raw: message })
         try {
           const parsed = JSON.parse(message)
           if (parsed.error) {
+            log(onLog, 'error', 'API_ERROR', 'Claude returned error object in stream', parsed.error)
             throw new Error(`Claude API error: ${JSON.stringify(parsed.error)}`)
           }
           if (parsed.completion) {
             fullResponse += parsed.completion
+            log(onLog, 'debug', 'STREAM', 'Accumulated response text', { length: fullResponse.length })
             if (onChunk) onChunk(fullResponse)
           }
         } catch (e) {
@@ -141,13 +201,19 @@ export async function sendPrompt(prompt, { onChunk, signal } = {}) {
         }
       },
       onError(err) {
+        log(onLog, 'error', 'SSE_ERROR', 'Claude SSE error', { error: err.message, stack: err.stack })
         throw err
       },
     })
-  } finally {
-    // Clean up single-turn conversation
-    await deleteConversation(orgId, convoId, cookieStr)
-  }
 
-  return fullResponse
+    log(onLog, 'info', 'PROMPT_COMPLETE', 'Claude finished successfully', { length: fullResponse.length })
+    return fullResponse
+  } catch (err) {
+    log(onLog, 'error', 'ERROR', `Claude failed: ${err.message || String(err)}`, { stack: err.stack })
+    throw err
+  } finally {
+    if (orgId && convoId && cookieStr) {
+      await deleteConversation(orgId, convoId, cookieStr, onLog)
+    }
+  }
 }

@@ -35,9 +35,10 @@ export function getProvider(name) {
  * @param {object} [options]
  * @param {(chunk: string) => void} [options.onChunk]
  * @param {AbortSignal} [options.signal]
+ * @param {(entry: object) => void} [options.onLog]
  * @returns {Promise<string>}
  */
-export async function sendPrompt(providerName, prompt, { onChunk, signal } = {}) {
+export async function sendPrompt(providerName, prompt, { onChunk, signal, onLog } = {}) {
   const provider = getProvider(providerName)
-  return provider.sendPrompt(prompt, { onChunk, signal })
+  return provider.sendPrompt(prompt, { onChunk, signal, onLog })
 }
