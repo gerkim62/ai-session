@@ -1,0 +1,36 @@
+{
+  "name": "ai-session-free",
+  "version": "0.1.0",
+  "description": "Headless web session AI client for ChatGPT, Claude, and Gemini — no API keys required",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./chatgpt": "./src/providers/chatgpt.js",
+    "./claude": "./src/providers/claude.js",
+    "./gemini": "./src/providers/gemini.js",
+    "./rules.json": "./rules.json"
+  },
+  "files": [
+    "src",
+    "vendor",
+    "rules.json",
+    "upstream-sources.json",
+    "check-upstream.sh",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --check src/index.js src/providers/*.js src/utils/*.js",
+    "check-upstream": "./check-upstream.sh"
+  },
+  "keywords": [
+    "ai",
+    "chatgpt",
+    "claude",
+    "gemini",
+    "chrome-extension",
+    "web-session",
+    "headless"
+  ],
+  "license": "MIT"
+}

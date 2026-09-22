@@ -1,0 +1,60 @@
+{
+  "description": "Tracks the upstream source of each vendored file for change detection.",
+  "last_checked": "2026-09-21",
+  "sources": [
+    {
+      "local_path": "src/providers/chatgpt.js",
+      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
+      "upstream_path": "src/services/apis/chatgpt-web.mjs",
+      "upstream_commit": "12db6b8",
+      "upstream_blob_sha": "37f63d518f4c9fd8fdf3709730927d54464df680",
+      "extracted_date": "2026-09-21",
+      "notes": "Sentinel PoW solver, SSE conversation flow. Adapted (not direct copy) — restructured into standalone sendPrompt() function."
+    },
+    {
+      "local_path": "src/providers/claude.js",
+      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
+      "upstream_path": "src/services/clients/claude/index.mjs",
+      "upstream_commit": "12db6b8",
+      "upstream_blob_sha": "02b9b11179418944a2cc5a45edcd47ecfdfaac28",
+      "extracted_date": "2026-09-21",
+      "notes": "Claude session key auth, conversation create/delete, SSE streaming. Model param intentionally omitted."
+    },
+    {
+      "local_path": "src/providers/gemini.js",
+      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
+      "upstream_path": "src/services/clients/bard/index.mjs",
+      "upstream_commit": "12db6b8",
+      "upstream_blob_sha": "240ab6278efdfb1a55936ecd829c0c107313a962",
+      "extracted_date": "2026-09-21",
+      "notes": "Bard/Gemini cookie auth + SNlM0e token + StreamGenerate endpoint. Also references HanaokaYuzu/Gemini-API (Python, commit 8c5b1dc)."
+    },
+    {
+      "local_path": "src/utils/sse-parser.js",
+      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
+      "upstream_path": "src/utils/eventsource-parser.mjs",
+      "upstream_commit": "12db6b8",
+      "upstream_blob_sha": "ff7033872572dfcfaba60a948189f623933cac19",
+      "extracted_date": "2026-09-21",
+      "notes": "SSE event stream parser. Originally from npm eventsource-parser@1.1.1."
+    },
+    {
+      "local_path": "rules.json",
+      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
+      "upstream_path": "src/rules.json",
+      "upstream_commit": "12db6b8",
+      "upstream_blob_sha": "aa2901980d9f517e544ab7e1947362fa959353b1",
+      "extracted_date": "2026-09-21",
+      "notes": "declarativeNetRequest rules for Origin/Referer header spoofing. Simplified to only the 3 providers we use."
+    },
+    {
+      "local_path": "vendor/sha3.min.js",
+      "upstream_repo": "emn178/js-sha3",
+      "upstream_path": "src/sha3.js",
+      "upstream_commit": "v0.9.3",
+      "upstream_blob_sha": "n/a (npm package)",
+      "extracted_date": "2026-09-21",
+      "notes": "SHA3-512 for ChatGPT PoW. Source: https://www.npmjs.com/package/js-sha3"
+    }
+  ]
+}

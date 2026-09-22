@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+sample-extension/dist/
+
+# Chrome extension runtime artifacts
+_metadata/
+
+# Upstream change audit diffs
+.upstream-diffs/
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+*.log

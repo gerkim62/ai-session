@@ -1,0 +1,9 @@
+packages:
+  - '.'
+  - 'sample-extension'
+
+allowBuilds:
+  esbuild: true
+
+onlyBuiltDependencies:
+  - esbuild

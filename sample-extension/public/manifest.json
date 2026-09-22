@@ -1,0 +1,34 @@
+{
+  "name": "AI Session Free Sample",
+  "description": "Sample Chrome extension demonstrating headless AI queries via ai-session-free",
+  "version": "0.1.0",
+  "manifest_version": 3,
+  "permissions": [
+    "cookies",
+    "storage",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "https://*.chatgpt.com/*",
+    "https://*.openai.com/*",
+    "https://claude.ai/*",
+    "https://*.google.com/*",
+    "https://gemini.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "AI Session Free Sample"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  }
+}
