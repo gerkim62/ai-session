@@ -46,15 +46,6 @@
       "upstream_blob_sha": "aa2901980d9f517e544ab7e1947362fa959353b1",
       "extracted_date": "2026-09-21",
       "notes": "declarativeNetRequest rules for Origin/Referer header spoofing. Simplified to only the 3 providers we use."
-    },
-    {
-      "local_path": "vendor/sha3.min.js",
-      "upstream_repo": "emn178/js-sha3",
-      "upstream_path": "src/sha3.js",
-      "upstream_commit": "v0.9.3",
-      "upstream_blob_sha": "n/a (npm package)",
-      "extracted_date": "2026-09-21",
-      "notes": "SHA3-512 for ChatGPT PoW. Source: https://www.npmjs.com/package/js-sha3"
     }
   ]
 }

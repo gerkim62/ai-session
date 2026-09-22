@@ -13,7 +13,6 @@
   },
   "files": [
     "src",
-    "vendor",
     "rules.json",
     "upstream-sources.json",
     "check-upstream.sh",
@@ -32,5 +31,8 @@
     "web-session",
     "headless"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "js-sha3": "^0.13.0"
+  }
 }

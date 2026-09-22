@@ -14,16 +14,8 @@
  *   - js-sha3 (bundled below as a minimal sha3_512 implementation)
  */
 
-import '../../vendor/sha3.min.js'
+import { sha3_512 } from 'js-sha3'
 import { fetchSSE } from '../utils/sse-parser.js'
-
-function getSha3() {
-  if (typeof globalThis !== 'undefined' && globalThis.sha3_512) return globalThis.sha3_512
-  if (typeof self !== 'undefined' && self.sha3_512) return self.sha3_512
-  if (typeof window !== 'undefined' && window.sha3_512) return window.sha3_512
-  console.warn('[chatgpt] sha3_512 not found. PoW will use fallback.')
-  return { create: () => ({ update: () => ({ hex: () => 'f'.repeat(128) }) }) }
-}
 
 function log(onLog, level, category, message, data) {
   if (typeof onLog === 'function') {
@@ -113,7 +105,6 @@ function toBase64(str) {
 }
 
 function generateProofToken(seed, diff) {
-  const sha3_512 = getSha3()
   const cores = [1, 2, 4]
   const screens = [3008, 4010, 6000]
 
@@ -223,7 +214,11 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
         requirements.proofofwork.seed,
         requirements.proofofwork.difficulty,
       )
-      log(onLog, 'info', 'POW_SOLVED', 'Proof-of-Work solved', { proofToken })
+      if (proofToken.startsWith('gAAAAABwQ8Lk')) {
+        log(onLog, 'warn', 'POW_FALLBACK', 'Proof-of-Work puzzle timed out; fallback token used', { proofToken })
+      } else {
+        log(onLog, 'info', 'POW_SOLVED', 'Proof-of-Work solved', { proofToken })
+      }
     }
 
     const oaiDeviceId = await getCookieValue('https://chatgpt.com/', 'oai-did', onLog)
@@ -309,9 +304,13 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
     log(onLog, 'info', 'PROMPT_COMPLETE', 'ChatGPT stream finished successfully', { answer })
     return answer
   } catch (err) {
-    log(onLog, 'error', 'ERROR', `ChatGPT failed: ${err.message || String(err)}`, {
+    let errMsg = err.message || String(err)
+    if (errMsg.includes('403') && errMsg.includes('Unusual activity')) {
+      errMsg = 'ChatGPT: Security challenge (HTTP 403: Unusual activity). Please keep https://chatgpt.com open in an active tab, refresh it or send a message there, and try again.'
+    }
+    log(onLog, 'error', 'ERROR', `ChatGPT failed: ${errMsg}`, {
       stack: err.stack,
     })
-    throw err
+    throw new Error(errMsg)
   }
 }
