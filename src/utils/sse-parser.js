@@ -4,6 +4,7 @@
  */
 
 import { createParser } from 'eventsource-parser'
+import { createHttpError } from './http.js'
 
 export { createParser }
 
@@ -34,7 +35,7 @@ export async function fetchSSE(url, options) {
       if (errBody) errMsg += `: ${errBody.slice(0, 200)}`
       else if (resp.statusText) errMsg += `: ${resp.statusText}`
     }
-    if (onError) await onError(new Error(errMsg))
+    if (onError) await onError(createHttpError(errMsg, resp.status, fetchOptions.provider || options.provider))
     return
   }
 

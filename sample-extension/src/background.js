@@ -4,7 +4,7 @@
  * Demonstrates consuming the `ai-session-free` library package.
  */
 
-import { sendPrompt } from 'ai-session-free'
+import { sendPrompt, checkSession } from 'ai-session-free'
 
 // Track active AbortControllers per port
 const activeRequests = new Map()
@@ -13,6 +13,24 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'ai-prompt') return
 
   port.onMessage.addListener(async (msg) => {
+    if (msg.type === 'CHECK_SESSION') {
+      try {
+        const result = await checkSession(msg.options)
+        port.postMessage({
+          type: 'SESSION_STATUS',
+          requestId: msg.requestId,
+          status: result,
+        })
+      } catch (err) {
+        port.postMessage({
+          type: 'SESSION_STATUS_ERROR',
+          requestId: msg.requestId,
+          error: err.message || String(err),
+        })
+      }
+      return
+    }
+
     if (msg.type !== 'SEND_PROMPT') return
 
     const { provider: providerName, prompt, requestId, debug } = msg
@@ -69,6 +87,8 @@ chrome.runtime.onConnect.addListener((port) => {
             requestId,
             provider: providerName,
             error: err.message || String(err),
+            status: err.status ?? null,
+            code: err.code || null,
           })
         } catch {
           // Port disconnected

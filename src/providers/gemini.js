@@ -18,7 +18,7 @@
  */
 
 import { createLogger } from '../utils/log.js'
-import { assertOk } from '../utils/http.js'
+import { assertOk, createHttpError } from '../utils/http.js'
 
 const log = createLogger('gemini')
 
@@ -40,7 +40,7 @@ async function getCookies(onLog) {
   })
 
   if (!psid?.value) {
-    throw new Error('Gemini: Not logged in. Please log in at https://gemini.google.com')
+    throw createHttpError('Gemini: Not logged in. Please log in at https://gemini.google.com', null, 'gemini', 'AUTH_REQUIRED')
   }
 
   let cookieStr = `__Secure-1PSID=${psid.value}`
@@ -59,6 +59,7 @@ async function getRequestParams(cookies, onLog) {
   const resp = await fetch('https://gemini.google.com/', {
     headers: { Cookie: cookies },
   })
+  await assertOk(resp, 'Gemini request params', { onLog, log, provider: 'gemini' })
   const text = await resp.text()
 
   const snlm0eMatch = text.match(/"SNlM0e":\s*"([^"]+)"/)
@@ -72,9 +73,12 @@ async function getRequestParams(cookies, onLog) {
   })
 
   if (!snlm0eMatch) {
-    throw new Error(
+    throw createHttpError(
       'Gemini: Could not extract SNlM0e token. Cookie may be expired. ' +
         'Please visit https://gemini.google.com and refresh your session.',
+      401,
+      'gemini',
+      'AUTH_REQUIRED',
     )
   }
 
@@ -222,7 +226,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
       body,
     })
 
-    await assertOk(resp, 'Gemini', { onLog, log })
+    await assertOk(resp, 'Gemini', { onLog, log, provider: 'gemini' })
 
     const data = await resp.text()
     log(onLog, 'info', 'NETWORK_RESPONSE', `StreamGenerate responded with ${resp.status}`, {
@@ -246,14 +250,86 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
       log(onLog, 'error', 'EMPTY_RESPONSE', 'Gemini returned an empty response after cleaning', {
         rawPayload: data,
       })
-      throw new Error('Gemini: Empty response. Session may have expired.')
+      throw createHttpError('Gemini: Empty response. Session may have expired.', 401, 'gemini', 'AUTH_REQUIRED')
     }
 
     if (onChunk) onChunk(answer)
     log(onLog, 'info', 'PROMPT_COMPLETE', 'Gemini completed successfully', { answerLength: answer.length })
     return answer
   } catch (err) {
+    if (err && !err.provider) err.provider = 'gemini'
     log(onLog, 'error', 'ERROR', `Gemini failed: ${err.message || String(err)}`, { stack: err.stack })
     throw err
+  }
+}
+
+/**
+ * Pre-flight authentication check for Gemini.
+ * @param {object} [options]
+ * @param {'cookie' | 'network'} [options.mode='cookie'] - 'cookie' for fast passive inspection, 'network' to ping https://gemini.google.com/
+ * @param {AbortSignal} [options.signal]
+ * @param {(entry: import('../utils/log.js').LogEntry) => void} [options.onLog]
+ * @returns {Promise<{ authenticated: boolean, loginUrl: string, reason?: string }>}
+ */
+export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
+  try {
+    const psid = await chrome.cookies.get({
+      url: 'https://gemini.google.com/',
+      name: '__Secure-1PSID',
+    })
+    log(onLog, 'debug', 'COOKIE', 'checkAuth: queried __Secure-1PSID cookie for Gemini', psid)
+    if (!psid?.value) {
+      return {
+        authenticated: false,
+        loginUrl: 'https://gemini.google.com/',
+        reason: 'Missing __Secure-1PSID cookie',
+      }
+    }
+
+    if (mode === 'network') {
+      const psidts = await chrome.cookies.get({
+        url: 'https://gemini.google.com/',
+        name: '__Secure-1PSIDTS',
+      })
+      let cookieStr = `__Secure-1PSID=${psid.value}`
+      if (psidts?.value) {
+        cookieStr += `; __Secure-1PSIDTS=${psidts.value}`
+      }
+      log(onLog, 'info', 'NETWORK_REQUEST', 'checkAuth: verifying Gemini endpoint reachability', {
+        url: 'https://gemini.google.com/',
+      })
+      const resp = await fetch('https://gemini.google.com/', {
+        headers: { Cookie: cookieStr },
+        signal,
+      })
+      if (!resp.ok) {
+        return {
+          authenticated: false,
+          loginUrl: 'https://gemini.google.com/',
+          reason: `HTTP ${resp.status}`,
+        }
+      }
+      const text = await resp.text().catch(() => '')
+      const snlm0eMatch = text.match(/"SNlM0e":\s*"([^"]+)"/)
+      if (!snlm0eMatch) {
+        return {
+          authenticated: false,
+          loginUrl: 'https://gemini.google.com/',
+          reason: 'Missing anti-CSRF token (session may be expired)',
+        }
+      }
+    }
+
+    return {
+      authenticated: true,
+      loginUrl: 'https://gemini.google.com/',
+    }
+  } catch (err) {
+    log(onLog, 'error', 'AUTH_CHECK_ERROR', `Gemini checkAuth error: ${err.message}`, { error: err.message })
+    return {
+      authenticated: false,
+      loginUrl: 'https://gemini.google.com/',
+      reason: err.message,
+    }
   }
 }

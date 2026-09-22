@@ -40,6 +40,10 @@ const statuses = {
   gemini: document.getElementById('status-gemini'),
 }
 
+// Session DOM refs
+const btnCheckSession = document.getElementById('btn-check-session')
+const sessionBadges = document.getElementById('session-badges')
+
 // Debug DOM refs
 const btnDebugFab = document.getElementById('btn-debug-fab')
 const debugBadge = document.getElementById('debug-badge')
@@ -95,12 +99,77 @@ function connectPort() {
         checkAllDone()
         break
 
-      case 'ERROR':
+      case 'SESSION_STATUS':
+        if (btnCheckSession) {
+          btnCheckSession.disabled = false
+          btnCheckSession.textContent = '🔄 Check Sessions'
+        }
+        if (msg.status) {
+          renderSessionStatus(msg.status)
+        }
+        break
+
+      case 'SESSION_STATUS_ERROR':
+        if (btnCheckSession) {
+          btnCheckSession.disabled = false
+          btnCheckSession.textContent = '🔄 Check Sessions'
+        }
+        console.error('Session check failed:', msg.error)
+        break
+
+      case 'ERROR': {
         setStatus(provider, 'error', 'error')
-        setBody(provider, '⚠ ' + error)
+        const bodyEl = bodies[provider]
+        bodyEl.innerHTML = ''
+        bodyEl.classList.remove('empty')
+
+        if (msg.code) {
+          const badge = document.createElement('div')
+          badge.className = 'error-code-badge'
+          badge.textContent = `${msg.code}${msg.status ? ` (HTTP ${msg.status})` : ''}`
+          bodyEl.appendChild(badge)
+        }
+
+        const msgDiv = document.createElement('div')
+        msgDiv.textContent = '⚠ ' + error
+        bodyEl.appendChild(msgDiv)
+
+        const defaultLoginUrls = {
+          chatgpt: 'https://chatgpt.com/auth/login',
+          claude: 'https://claude.ai/login',
+          gemini: 'https://gemini.google.com/',
+        }
+
+        if (msg.code === 'AUTH_REQUIRED') {
+          const link = document.createElement('a')
+          link.className = 'error-action-link'
+          link.href = defaultLoginUrls[provider] || 'https://google.com'
+          link.target = '_blank'
+          link.rel = 'noreferrer noopener'
+          link.textContent = `Sign in to ${provider.toUpperCase()} ↗`
+          bodyEl.appendChild(link)
+        } else if (msg.code === 'CLOUDFLARE_CHALLENGE') {
+          const link = document.createElement('a')
+          link.className = 'error-action-link'
+          link.href = defaultLoginUrls[provider] || 'https://google.com'
+          link.target = '_blank'
+          link.rel = 'noreferrer noopener'
+          link.textContent = `Open ${provider.toUpperCase()} tab to verify ↗`
+          bodyEl.appendChild(link)
+        } else if (msg.code === 'FORBIDDEN') {
+          const link = document.createElement('a')
+          link.className = 'error-action-link'
+          link.href = defaultLoginUrls[provider] || 'https://google.com'
+          link.target = '_blank'
+          link.rel = 'noreferrer noopener'
+          link.textContent = `Visit ${provider.toUpperCase()} ↗`
+          bodyEl.appendChild(link)
+        }
+
         activeProviders.delete(provider)
         checkAllDone()
         break
+      }
 
       case 'ABORTED':
         setStatus(provider, 'aborted', '')
@@ -381,3 +450,51 @@ for (const pill of filterPills) {
     reRenderLogs()
   })
 }
+
+// --- Pre-flight Session Detection UI ---
+function renderSessionStatus(result) {
+  if (!sessionBadges) return
+  sessionBadges.innerHTML = ''
+  for (const [provider, info] of Object.entries(result.providers)) {
+    const badge = document.createElement(info.authenticated ? 'span' : 'a')
+    badge.className = `session-badge ${info.authenticated ? 'ready' : 'error'}`
+    badge.title = info.reason || (info.authenticated ? 'Active session' : 'Click to log in')
+    if (!info.authenticated) {
+      badge.href = info.loginUrl || '#'
+      badge.target = '_blank'
+      badge.rel = 'noreferrer noopener'
+    }
+
+    const dot = document.createElement('span')
+    dot.className = 'session-badge-dot'
+    badge.appendChild(dot)
+
+    const label = document.createElement('span')
+    label.textContent = `${provider.toUpperCase()}: ${info.authenticated ? 'Ready' : 'Login'}`
+    badge.appendChild(label)
+
+    sessionBadges.appendChild(badge)
+  }
+}
+
+function requestCheckSession(mode = 'cookie') {
+  if (!port) connectPort()
+  if (btnCheckSession) {
+    btnCheckSession.disabled = true
+    btnCheckSession.textContent = 'Checking...'
+  }
+  port.postMessage({
+    type: 'CHECK_SESSION',
+    options: { mode },
+    requestId: 'session_check_' + Date.now(),
+  })
+}
+
+if (btnCheckSession) {
+  btnCheckSession.addEventListener('click', () => {
+    requestCheckSession('network')
+  })
+}
+
+// Initial session check on popup load
+requestCheckSession('cookie')

@@ -111,6 +111,63 @@ await sendPrompt('chatgpt', "Hello", {
 })
 ```
 
+### 4. Pre-Flight Session Detection (`checkSession` / `checkAuth`)
+Verify whether sessions are active before sending prompts, without triggering unnecessary conversation turns or latency:
+
+```javascript
+import { checkSession, claude, chatgpt, gemini } from 'ai-session-free'
+
+// Fast cookie check across all providers (default mode: 'cookie')
+const status = await checkSession()
+// Returns:
+// {
+//   available: ['claude'],
+//   providers: {
+//     claude: { authenticated: true, loginUrl: 'https://claude.ai/' },
+//     chatgpt: { authenticated: false, loginUrl: 'https://chatgpt.com/auth/login', reason: 'Missing session token cookie' },
+//     gemini: { authenticated: false, loginUrl: 'https://gemini.google.com/', reason: 'Missing __Secure-1PSID cookie' }
+//   }
+// }
+
+// Or verify live endpoint reachability and boq/anti-CSRF tokens:
+const liveStatus = await checkSession({
+  mode: 'network',
+  providers: ['claude', 'gemini'], // optional provider filter
+  signal: abortController.signal    // optional cancellation
+})
+
+// Or query an individual provider directly:
+const isClaudeReady = await claude.checkAuth({ mode: 'cookie' })
+// Returns: { authenticated: boolean, loginUrl: string, reason?: string }
+```
+
+### 5. Structured HTTP Status & Error Codes
+Errors thrown during prompt execution or auth checks carry structured metadata on standard `Error` objects:
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `err.status` | `number \| null` | HTTP response status (e.g. `401`, `403`, `429`), or `null` for pre-network failures |
+| `err.code` | `string` | Machine-readable error code (`AUTH_REQUIRED`, `FORBIDDEN`, `CLOUDFLARE_CHALLENGE`, `RATE_LIMITED`, `HTTP_ERROR`) |
+| `err.provider`| `string` | Associated provider identifier (`'chatgpt'`, `'claude'`, or `'gemini'`) |
+
+Example consumer error handling:
+
+```javascript
+try {
+  await sendPrompt('chatgpt', prompt)
+} catch (err) {
+  if (err.code === 'AUTH_REQUIRED' || err.status === 401) {
+    // Prompt user to log in via err.loginUrl or show actionable sign-in modal
+  } else if (err.code === 'CLOUDFLARE_CHALLENGE') {
+    // Notify user to open tab and pass human challenge (e.g. Cloudflare Turnstile)
+  } else if (err.code === 'FORBIDDEN' || err.status === 403) {
+    // Permission denied / region restriction
+  } else if (err.code === 'RATE_LIMITED' || err.status === 429) {
+    // Handle backoff / throttling
+  }
+}
+```
+
 ---
 
 ## Required Extension Permissions
