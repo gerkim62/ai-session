@@ -14,17 +14,34 @@ chrome.runtime.onConnect.addListener((port) => {
 
   port.onMessage.addListener(async (msg) => {
     if (msg.type === 'CHECK_SESSION') {
+      const { options = {}, requestId, debug } = msg
       try {
-        const result = await checkSession(msg.options)
+        const result = await checkSession({
+          ...options,
+          onLog: debug
+            ? (entry) => {
+                try {
+                  port.postMessage({
+                    type: 'DEBUG_LOG',
+                    requestId,
+                    provider: entry.provider || 'system',
+                    entry,
+                  })
+                } catch {
+                  // Port disconnected
+                }
+              }
+            : undefined,
+        })
         port.postMessage({
           type: 'SESSION_STATUS',
-          requestId: msg.requestId,
+          requestId,
           status: result,
         })
       } catch (err) {
         port.postMessage({
           type: 'SESSION_STATUS_ERROR',
-          requestId: msg.requestId,
+          requestId,
           error: err.message || String(err),
         })
       }

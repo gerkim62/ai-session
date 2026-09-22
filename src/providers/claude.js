@@ -209,6 +209,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
     log(onLog, 'debug', 'COOKIE', 'checkAuth: retrieved cookies for https://claude.ai/', cookies)
     const sessionCookie = cookies.find((c) => c.name === 'sessionKey')
     if (!sessionCookie?.value) {
+      log(onLog, 'warn', 'AUTH_CHECK_FAIL', 'checkAuth: missing sessionKey cookie')
       return {
         authenticated: false,
         loginUrl: 'https://claude.ai/login',
@@ -229,6 +230,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       })
       if (!resp.ok) {
         const reason = resp.status === 403 ? 'Forbidden' : `HTTP ${resp.status}`
+        log(onLog, 'warn', 'AUTH_CHECK_FAIL', `checkAuth: Claude organizations responded with HTTP ${resp.status}`, { status: resp.status })
         return {
           authenticated: false,
           loginUrl: 'https://claude.ai/login',
@@ -237,6 +239,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       }
       const text = await resp.text().catch(() => '')
       if (text.includes('available in certain regions')) {
+        log(onLog, 'warn', 'REGION_BLOCK', 'checkAuth: Claude not available in your region')
         return {
           authenticated: false,
           loginUrl: 'https://claude.ai/',
@@ -250,6 +253,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
         orgs = null
       }
       if (!orgs?.length) {
+        log(onLog, 'warn', 'AUTH_CHECK_FAIL', 'checkAuth: No organizations found')
         return {
           authenticated: false,
           loginUrl: 'https://claude.ai/',
@@ -258,6 +262,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       }
     }
 
+    log(onLog, 'info', 'AUTH_CHECK_SUCCESS', 'checkAuth: Claude authenticated successfully')
     return {
       authenticated: true,
       loginUrl: 'https://claude.ai/',

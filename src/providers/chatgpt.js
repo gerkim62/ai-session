@@ -332,6 +332,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
     log(onLog, 'debug', 'COOKIE', 'checkAuth: retrieved cookies for https://chatgpt.com/', cookies)
     const hasToken = cookies.some((c) => c.name.includes('session-token'))
     if (!hasToken) {
+      log(onLog, 'warn', 'AUTH_CHECK_FAIL', 'checkAuth: missing session-token cookie')
       return {
         authenticated: false,
         loginUrl: 'https://chatgpt.com/auth/login',
@@ -352,6 +353,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       })
 
       if (resp.status === 403) {
+        log(onLog, 'warn', 'SECURITY_CHALLENGE', 'checkAuth: ChatGPT returned HTTP 403 (Cloudflare challenge)')
         return {
           authenticated: false,
           loginUrl: 'https://chatgpt.com/',
@@ -362,6 +364,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       if (resp.status === 200) {
         const data = await resp.json().catch(() => ({}))
         if (data?.accessToken) {
+          log(onLog, 'info', 'AUTH_CHECK_SUCCESS', 'checkAuth: ChatGPT authenticated successfully')
           return {
             authenticated: true,
             loginUrl: 'https://chatgpt.com/',
@@ -369,6 +372,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
         }
       }
 
+      log(onLog, 'warn', 'AUTH_CHECK_FAIL', `checkAuth: ChatGPT session endpoint returned HTTP ${resp.status} without accessToken`)
       return {
         authenticated: false,
         loginUrl: 'https://chatgpt.com/auth/login',
@@ -376,6 +380,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       }
     }
 
+    log(onLog, 'info', 'AUTH_CHECK_SUCCESS', 'checkAuth: ChatGPT authenticated successfully')
     return {
       authenticated: true,
       loginUrl: 'https://chatgpt.com/',

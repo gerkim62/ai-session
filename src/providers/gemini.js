@@ -279,6 +279,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
     })
     log(onLog, 'debug', 'COOKIE', 'checkAuth: queried __Secure-1PSID cookie for Gemini', psid)
     if (!psid?.value) {
+      log(onLog, 'warn', 'AUTH_CHECK_FAIL', 'checkAuth: missing __Secure-1PSID cookie')
       return {
         authenticated: false,
         loginUrl: 'https://gemini.google.com/',
@@ -303,6 +304,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
         signal,
       })
       if (!resp.ok) {
+        log(onLog, 'warn', 'AUTH_CHECK_FAIL', `checkAuth: Gemini endpoint returned HTTP ${resp.status}`)
         return {
           authenticated: false,
           loginUrl: 'https://gemini.google.com/',
@@ -312,6 +314,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       const text = await resp.text().catch(() => '')
       const snlm0eMatch = text.match(/"SNlM0e":\s*"([^"]+)"/)
       if (!snlm0eMatch) {
+        log(onLog, 'warn', 'AUTH_CHECK_FAIL', 'checkAuth: anti-CSRF token SNlM0e not found in page HTML')
         return {
           authenticated: false,
           loginUrl: 'https://gemini.google.com/',
@@ -320,6 +323,7 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       }
     }
 
+    log(onLog, 'info', 'AUTH_CHECK_SUCCESS', 'checkAuth: Gemini authenticated successfully')
     return {
       authenticated: true,
       loginUrl: 'https://gemini.google.com/',

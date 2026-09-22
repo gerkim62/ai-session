@@ -486,6 +486,7 @@ function requestCheckSession(mode = 'cookie') {
   port.postMessage({
     type: 'CHECK_SESSION',
     options: { mode },
+    debug: isDebugMode,
     requestId: 'session_check_' + Date.now(),
   })
 }
