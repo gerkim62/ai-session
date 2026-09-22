@@ -1,4 +1,5 @@
 /**
+ * @module providers/claude
  * Claude Web Provider
  *
  * Reverse-engineered Claude web API using session cookie auth.
@@ -13,29 +14,13 @@
  */
 
 import { fetchSSE } from '../utils/sse-parser.js'
+import { createLogger } from '../utils/log.js'
+import { generateUUID } from '../utils/crypto.js'
+import { buildCookieString, assertOk } from '../utils/http.js'
 
-function log(onLog, level, category, message, data) {
-  if (typeof onLog === 'function') {
-    try {
-      onLog({
-        timestamp: new Date().toISOString(),
-        provider: 'claude',
-        level,
-        category,
-        message,
-        data,
-      })
-    } catch {
-      // Do not let logger failures interrupt execution
-    }
-  }
-}
+const log = createLogger('claude')
 
 // --- Helpers ---
-
-function uuid() {
-  return crypto.randomUUID()
-}
 
 async function getClaudeAuth(onLog) {
   const cookies = await chrome.cookies.getAll({ url: 'https://claude.ai/' })
@@ -44,7 +29,7 @@ async function getClaudeAuth(onLog) {
   if (!sessionCookie?.value) {
     throw new Error('Claude: Not logged in. Please log in at https://claude.ai')
   }
-  const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
+  const cookieStr = buildCookieString(cookies)
   return { sessionKey: sessionCookie.value, cookieStr }
 }
 
@@ -67,14 +52,7 @@ async function getOrganizationId(cookieStr, onLog) {
     credentials: 'include',
     headers,
   })
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => '')
-    log(onLog, 'error', 'NETWORK_RESPONSE', `Claude organizations failed with HTTP ${resp.status}`, {
-      status: resp.status,
-      body: errText,
-    })
-    throw new Error(`Claude organizations HTTP ${resp.status}: ${errText.slice(0, 200)}`)
-  }
+  await assertOk(resp, 'Claude organizations', { onLog, log })
   const text = await resp.text()
   if (text.includes('available in certain regions')) {
     log(onLog, 'error', 'REGION_BLOCK', 'Claude region restriction detected', { text })
@@ -89,7 +67,7 @@ async function getOrganizationId(cookieStr, onLog) {
 async function createConversation(orgId, cookieStr, signal, onLog) {
   const url = `https://claude.ai/api/organizations/${orgId}/chat_conversations`
   const headers = makeHeaders(cookieStr)
-  const body = { name: '', uuid: uuid() }
+  const body = { name: '', uuid: generateUUID() }
 
   log(onLog, 'info', 'NETWORK_REQUEST', 'Creating temporary chat conversation', {
     url,
@@ -104,14 +82,7 @@ async function createConversation(orgId, cookieStr, signal, onLog) {
     signal,
     body: JSON.stringify(body),
   })
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => '')
-    log(onLog, 'error', 'NETWORK_RESPONSE', `Failed creating conversation with HTTP ${resp.status}`, {
-      status: resp.status,
-      body: errText,
-    })
-    throw new Error(`Claude createConversation HTTP ${resp.status}: ${errText.slice(0, 200)}`)
-  }
+  await assertOk(resp, 'Claude createConversation', { onLog, log })
   const data = await resp.json()
   log(onLog, 'info', 'NETWORK_RESPONSE', 'Created temporary conversation', data)
   if (!data?.uuid) throw new Error('Claude: Failed to create conversation')
@@ -136,12 +107,16 @@ async function deleteConversation(orgId, convoId, cookieStr, onLog) {
 // --- Main send function ---
 
 /**
+ * @typedef {Object} PromptOptions
+ * @property {(chunk: string) => void} [onChunk] - Called with accumulated answer text
+ * @property {AbortSignal} [signal] - Abort signal to cancel the request
+ * @property {(entry: import('../utils/log.js').LogEntry) => void} [onLog] - Called with diagnostic log events
+ */
+
+/**
  * Send a prompt to Claude web and stream the response.
  * @param {string} prompt
- * @param {object} [options]
- * @param {(chunk: string) => void} [options.onChunk] - called with accumulated answer text
- * @param {AbortSignal} [options.signal]
- * @param {(entry: object) => void} [options.onLog] - called with diagnostic log events
+ * @param {PromptOptions} [options]
  * @returns {Promise<string>} final answer text
  */
 export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {

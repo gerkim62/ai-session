@@ -1,4 +1,5 @@
 /**
+ * @module providers/chatgpt
  * ChatGPT Web Provider
  *
  * Reverse-engineered ChatGPT web API using the Sentinel PoW flow.
@@ -11,28 +12,16 @@
  *   - getRequirements / getArkoseToken / generateAnswersWithChatgptWebApi
  *
  * Dependencies:
- *   - js-sha3 (bundled below as a minimal sha3_512 implementation)
+ *   - js-sha3 (npm dependency)
  */
 
 import { sha3_512 } from 'js-sha3'
 import { fetchSSE } from '../utils/sse-parser.js'
+import { createLogger } from '../utils/log.js'
+import { generateUUID } from '../utils/crypto.js'
+import { buildCookieString } from '../utils/http.js'
 
-function log(onLog, level, category, message, data) {
-  if (typeof onLog === 'function') {
-    try {
-      onLog({
-        timestamp: new Date().toISOString(),
-        provider: 'chatgpt',
-        level,
-        category,
-        message,
-        data,
-      })
-    } catch {
-      // Do not let logger failures interrupt execution
-    }
-  }
-}
+const log = createLogger('chatgpt')
 
 // --- Cookie / Token helpers ---
 
@@ -45,7 +34,7 @@ async function getCookieValue(url, name, onLog) {
 async function getAccessToken(onLog) {
   const cookies = await chrome.cookies.getAll({ url: 'https://chatgpt.com/' })
   log(onLog, 'debug', 'COOKIE', 'Retrieved all cookies for https://chatgpt.com/', cookies)
-  const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ')
+  const cookieStr = buildCookieString(cookies)
 
   const reqHeaders = { ...(cookieStr && { Cookie: cookieStr }) }
   log(onLog, 'info', 'NETWORK_REQUEST', 'Fetching ChatGPT session token', {
@@ -145,11 +134,7 @@ function generateProofToken(seed, diff) {
   return 'gAAAAABwQ8Lk5FbGpA2NcR9dShT6gYjU7VxZ4D' + toBase64(`"${seed}"`)
 }
 
-// --- Main send function ---
-
-function generateUUID() {
-  return crypto.randomUUID()
-}
+// --- Text cleaner ---
 
 function cleanChatGPTText(text) {
   if (!text) return ''
@@ -168,7 +153,7 @@ function cleanChatGPTText(text) {
   })
 
   // 2. Incomplete entity tag during streaming: \ue200entity\ue202["category","Name"...
-  out = out.replace(/\ue200entity\ue202\["(?:[^"\\]|\\.)*"(?:,\s*"((?:[^"\\]|\\.)*)")?[^\ue201]*$/g, (_, name) => {
+  out = out.replace(/\ue200entity\ue202\["(?:[^"\\]|\\.)*"(?:,\s*"((?:[^"\\]|\\.)*)"\s*)?[^\ue201]*$/g, (_, name) => {
     return name || ''
   })
 
@@ -184,13 +169,19 @@ function cleanChatGPTText(text) {
   return out
 }
 
+// --- Main send function ---
+
+/**
+ * @typedef {Object} PromptOptions
+ * @property {(chunk: string) => void} [onChunk] - Called with accumulated answer text
+ * @property {AbortSignal} [signal] - Abort signal to cancel the request
+ * @property {(entry: import('../utils/log.js').LogEntry) => void} [onLog] - Called with diagnostic log events
+ */
+
 /**
  * Send a prompt to ChatGPT web and stream the response.
  * @param {string} prompt
- * @param {object} [options]
- * @param {(chunk: string) => void} [options.onChunk] - called with accumulated answer text
- * @param {AbortSignal} [options.signal]
- * @param {(entry: object) => void} [options.onLog] - called with diagnostic log events
+ * @param {PromptOptions} [options]
  * @returns {Promise<string>} final answer text
  */
 export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
@@ -223,7 +214,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
 
     const oaiDeviceId = await getCookieValue('https://chatgpt.com/', 'oai-did', onLog)
     const cookies = await chrome.cookies.getAll({ url: 'https://chatgpt.com/' })
-    const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ')
+    const cookieStr = buildCookieString(cookies)
 
     const messageId = generateUUID()
     const parentMessageId = generateUUID()

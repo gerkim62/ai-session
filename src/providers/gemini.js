@@ -1,4 +1,5 @@
 /**
+ * @module providers/gemini
  * Gemini Web Provider
  *
  * Reverse-engineered Gemini (formerly Bard) web API.
@@ -13,25 +14,13 @@
  *   - Requires __Secure-1PSID and __Secure-1PSIDTS cookies from google.com
  *   - Extracts SNlM0e and cfb2h tokens from gemini.google.com HTML
  *   - POSTs to /_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate
- *   - Response is NOT SSE — it's a batch JSON format with )]}\' prefix
+ *   - Response is NOT SSE — it's a batch JSON format with )]}' prefix
  */
 
-function log(onLog, level, category, message, data) {
-  if (typeof onLog === 'function') {
-    try {
-      onLog({
-        timestamp: new Date().toISOString(),
-        provider: 'gemini',
-        level,
-        category,
-        message,
-        data,
-      })
-    } catch {
-      // Do not let logger failures interrupt execution
-    }
-  }
-}
+import { createLogger } from '../utils/log.js'
+import { assertOk } from '../utils/http.js'
+
+const log = createLogger('gemini')
 
 // --- Cookie & token helpers ---
 
@@ -170,7 +159,7 @@ function parseResponse(text) {
   return answer || fallbackLongest
 }
 
-// --- Main send function ---
+// --- Text cleaner ---
 
 function cleanGeminiText(text) {
   if (!text) return ''
@@ -183,14 +172,20 @@ function cleanGeminiText(text) {
     .trim()
 }
 
+// --- Main send function ---
+
+/**
+ * @typedef {Object} PromptOptions
+ * @property {(chunk: string) => void} [onChunk] - Called once with the full answer
+ * @property {AbortSignal} [signal] - Abort signal to cancel the request
+ * @property {(entry: import('../utils/log.js').LogEntry) => void} [onLog] - Called with diagnostic log events
+ */
+
 /**
  * Send a prompt to Gemini web and return the response.
  * Note: Gemini does NOT stream via SSE — the full response comes in one batch.
  * @param {string} prompt
- * @param {object} [options]
- * @param {(chunk: string) => void} [options.onChunk] - called once with the full answer
- * @param {AbortSignal} [options.signal]
- * @param {(entry: object) => void} [options.onLog] - called with diagnostic log events
+ * @param {PromptOptions} [options]
  * @returns {Promise<string>} answer text
  */
 export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
@@ -227,14 +222,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
       body,
     })
 
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => '')
-      log(onLog, 'error', 'NETWORK_RESPONSE', `Gemini HTTP ${resp.status} error`, {
-        status: resp.status,
-        body: errText,
-      })
-      throw new Error(`Gemini HTTP ${resp.status}: ${errText.slice(0, 200)}`)
-    }
+    await assertOk(resp, 'Gemini', { onLog, log })
 
     const data = await resp.text()
     log(onLog, 'info', 'NETWORK_RESPONSE', `StreamGenerate responded with ${resp.status}`, {

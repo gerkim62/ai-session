@@ -1,4 +1,5 @@
 /**
+ * @module ai-session-free
  * AI Session Free — Core Library Entry Point
  *
  * Query ChatGPT, Claude, and Gemini headlessly using existing browser sessions.

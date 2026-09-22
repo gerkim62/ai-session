@@ -14,8 +14,6 @@
   "files": [
     "src",
     "rules.json",
-    "upstream-sources.json",
-    "check-upstream.sh",
     "README.md"
   ],
   "scripts": {
@@ -33,6 +31,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "eventsource-parser": "^4.1.1",
     "js-sha3": "^0.13.0"
   }
 }

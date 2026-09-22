@@ -13,8 +13,8 @@ ai-session-free/
 ├── package.json              # Library package definition with ESM exports
 ├── pnpm-workspace.yaml       # Workspace linking root package to sample-extension
 ├── rules.json                # DeclarativeNetRequest rules (Origin/Referer spoofing)
-├── upstream-sources.json     # Upstream tracking registry
-├── check-upstream.sh         # Upstream integrity audit script
+├── upstream-sources.json     # Upstream tracking registry (dev only)
+├── check-upstream.sh         # Upstream integrity audit script (dev only)
 ├── src/                      # Library Core (pure ESM)
 │   ├── index.js              # Unified entry: exports sendPrompt, chatgpt, claude, gemini
 │   ├── providers/
@@ -22,19 +22,20 @@ ai-session-free/
 │   │   ├── claude.js         # sendPrompt(prompt, { onChunk, signal } = {})
 │   │   └── gemini.js         # sendPrompt(prompt, { onChunk, signal } = {})
 │   └── utils/
-│       └── sse-parser.js     # Zero-dependency SSE parser
-├── vendor/
-│   └── sha3.min.js           # SHA3-512 for Sentinel PoW
+│       ├── crypto.js         # Shared UUID generation
+│       ├── http.js           # Shared cookie string / HTTP error helpers
+│       ├── log.js            # Shared structured logger factory
+│       └── sse-parser.js     # SSE streaming fetch helper (powered by eventsource-parser)
 └── sample-extension/         # Working sample Chrome Extension (Vite)
     ├── package.json          # Depends on "ai-session-free": "workspace:*"
-    ├── vite.config.js        # Minimal Vite build bundling for MV3
+    ├── vite.config.js        # Vite build config (auto-copies rules.json from library)
     ├── public/
-    │   ├── manifest.json     # Extension Manifest V3
-    │   └── rules.json        # DeclarativeNetRequest rules
+    │   └── manifest.json     # Extension Manifest V3
     ├── app.html              # UI dashboard
     └── src/
-        ├── background.js     # Imports directly from 'ai-session-free'
-        └── app.js            # UI logic
+        ├── app.css           # UI styles
+        ├── app.js            # UI logic
+        └── background.js     # Imports directly from 'ai-session-free'
 ```
 
 ---
@@ -120,7 +121,6 @@ Any Chrome extension consuming this library must include the following permissio
 {
   "permissions": [
     "cookies",
-    "storage",
     "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
@@ -180,9 +180,9 @@ The core reverse-engineering logic in this library was extracted and adapted fro
 | [`src/providers/chatgpt.js`](src/providers/chatgpt.js) | [ChatGPTBox-dev/chatGPTBox](https://github.com/ChatGPTBox-dev/chatGPTBox) | [`src/services/apis/chatgpt-web.mjs`](https://github.com/ChatGPTBox-dev/chatGPTBox/blob/12db6b8401340a6b29efb75e114095bb736db8a2/src/services/apis/chatgpt-web.mjs#L99-L150) | `12db6b8` | Extracts Sentinel chat-requirements, SHA3-512 Proof-of-Work (PoW) generation, device ID / session token cookies, and SSE streaming. Researched from [chatgpt-exporter](https://github.com/pionxzh/chatgpt-exporter) to properly parse PUA citations and entity tokens. |
 | [`src/providers/claude.js`](src/providers/claude.js) | [ChatGPTBox-dev/chatGPTBox](https://github.com/ChatGPTBox-dev/chatGPTBox) | [`src/services/clients/claude/index.mjs`](https://github.com/ChatGPTBox-dev/chatGPTBox/blob/12db6b8401340a6b29efb75e114095bb736db8a2/src/services/clients/claude/index.mjs#L269-L318) | `12db6b8` | Extracts Claude sessionKey cookie handling, organization retrieval, temporary conversation creation and auto-cleanup. Model parameter is omitted to prevent `model_not_allowed` errors. |
 | [`src/providers/gemini.js`](src/providers/gemini.js) | [ChatGPTBox-dev/chatGPTBox](https://github.com/ChatGPTBox-dev/chatGPTBox)<br>and [HanaokaYuzu/Gemini-API](https://github.com/HanaokaYuzu/Gemini-API) | [`src/services/clients/bard/index.mjs`](https://github.com/ChatGPTBox-dev/chatGPTBox/blob/12db6b8401340a6b29efb75e114095bb736db8a2/src/services/clients/bard/index.mjs#L65-L136)<br>and [`src/gemini_webapi/client.py`](https://github.com/HanaokaYuzu/Gemini-API/blob/8c5b1dcbf54ecf093551cc20bd25cef438190ba8/src/gemini_webapi/client.py) | `12db6b8`<br>`8c5b1dc` | Extracts `__Secure-1PSID` and `__Secure-1PSIDTS` cookies, parses `SNlM0e` anti-CSRF token, queries `StreamGenerate`, and targets candidate 0 with card content fallback. |
-| [`src/utils/sse-parser.js`](src/utils/sse-parser.js) | [ChatGPTBox-dev/chatGPTBox](https://github.com/ChatGPTBox-dev/chatGPTBox) | [`src/utils/eventsource-parser.mjs`](https://github.com/ChatGPTBox-dev/chatGPTBox/blob/12db6b8401340a6b29efb75e114095bb736db8a2/src/utils/eventsource-parser.mjs#L1-L136) | `12db6b8` | Zero-dependency Server-Sent Events parser derived from `eventsource-parser@1.1.1`. |
+| [`src/utils/sse-parser.js`](src/utils/sse-parser.js) | [rexxars/eventsource-parser](https://github.com/rexxars/eventsource-parser) | [`src/index.ts`](https://github.com/rexxars/eventsource-parser) | `npm` | Streaming Server-Sent Events parser powered by official npm package `eventsource-parser`. |
 | [`rules.json`](rules.json) | [ChatGPTBox-dev/chatGPTBox](https://github.com/ChatGPTBox-dev/chatGPTBox) | [`src/rules.json`](https://github.com/ChatGPTBox-dev/chatGPTBox/blob/12db6b8401340a6b29efb75e114095bb736db8a2/src/rules.json) | `12db6b8` | Declarative Net Request rules configured to spoof `Origin` and `Referer` headers specifically for `chatgpt.com`, `claude.ai`, and `gemini.google.com`. |
-| [`vendor/sha3.min.js`](vendor/sha3.min.js) | [emn178/js-sha3](https://github.com/emn178/js-sha3) | [`src/sha3.js`](https://github.com/emn178/js-sha3/blob/v0.9.3/src/sha3.js) | `v0.9.3` | Pure JavaScript SHA3-512 calculation required for OpenAI Sentinel PoW solving. |
+
 
 ---
 

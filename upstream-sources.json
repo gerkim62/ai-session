@@ -28,24 +28,6 @@
       "upstream_blob_sha": "240ab6278efdfb1a55936ecd829c0c107313a962",
       "extracted_date": "2026-09-21",
       "notes": "Bard/Gemini cookie auth + SNlM0e token + StreamGenerate endpoint. Also references HanaokaYuzu/Gemini-API (Python, commit 8c5b1dc)."
-    },
-    {
-      "local_path": "src/utils/sse-parser.js",
-      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
-      "upstream_path": "src/utils/eventsource-parser.mjs",
-      "upstream_commit": "12db6b8",
-      "upstream_blob_sha": "ff7033872572dfcfaba60a948189f623933cac19",
-      "extracted_date": "2026-09-21",
-      "notes": "SSE event stream parser. Originally from npm eventsource-parser@1.1.1."
-    },
-    {
-      "local_path": "rules.json",
-      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
-      "upstream_path": "src/rules.json",
-      "upstream_commit": "12db6b8",
-      "upstream_blob_sha": "aa2901980d9f517e544ab7e1947362fa959353b1",
-      "extracted_date": "2026-09-21",
-      "notes": "declarativeNetRequest rules for Origin/Referer header spoofing. Simplified to only the 3 providers we use."
     }
   ]
 }
