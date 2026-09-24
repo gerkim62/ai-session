@@ -278,6 +278,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
         }
         try {
           const data = JSON.parse(message)
+          if (data.message?.author?.role !== "assistant") return
           const text = data.message?.content?.parts?.[0]
           if (typeof text === 'string' && data.message?.content?.content_type === 'text') {
             answer = cleanChatGPTText(text)
