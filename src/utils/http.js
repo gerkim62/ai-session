@@ -13,14 +13,15 @@ export function buildCookieString(cookies) {
 }
 
 /**
- * Create an Error decorated with status, code, and provider metadata.
+ * Create an Error decorated with status, code, provider metadata, and actionUrl.
  * @param {string} message
  * @param {number|null} [status]
  * @param {string} [provider]
  * @param {string} [code]
- * @returns {Error & { status: number|null, code: string, provider?: string }}
+ * @param {string|null} [actionUrl]
+ * @returns {Error & { status: number|null, code: string, provider?: string, actionUrl?: string }}
  */
-export function createHttpError(message, status = null, provider, code) {
+export function createHttpError(message, status = null, provider, code, actionUrl = null) {
   const err = new Error(message)
   err.status = status ?? null
   if (provider) err.provider = provider
@@ -38,6 +39,12 @@ export function createHttpError(message, status = null, provider, code) {
   } else {
     err.code = 'AUTH_REQUIRED'
   }
+
+  // Attach actionable resolution URL
+  if (actionUrl) {
+    err.actionUrl = actionUrl
+  }
+
   return err
 }
 

@@ -19,6 +19,29 @@ export const providers = {
 }
 
 /**
+ * Returns static metadata for a given provider name without needing cookies or network calls.
+ * @param {string} name
+ * @returns {{ id: string, displayName: string, shortName: string, loginUrl: string, challengeUrl: string, homeUrl: string } | null}
+ */
+export function getProviderMetadata(name) {
+  return providers[name]?.metadata || null
+}
+
+/**
+ * Returns metadata for all registered providers.
+ * @returns {Record<string, { id: string, displayName: string, shortName: string, loginUrl: string, challengeUrl: string, homeUrl: string }>}
+ */
+export function getAllProvidersMetadata() {
+  const result = {}
+  for (const [key, p] of Object.entries(providers)) {
+    if (p.metadata) {
+      result[key] = p.metadata
+    }
+  }
+  return result
+}
+
+/**
  * Get a provider module by string name.
  * @param {'chatgpt' | 'claude' | 'gemini'} name
  */
@@ -31,10 +54,22 @@ export function getProvider(name) {
 }
 
 /**
+ * @typedef {Object} ProviderMetadata
+ * @property {string} id
+ * @property {string} displayName
+ * @property {string} shortName
+ * @property {string} loginUrl
+ * @property {string} challengeUrl
+ * @property {string} homeUrl
+ */
+
+/**
  * @typedef {Object} ProviderAuthResult
  * @property {boolean} authenticated
  * @property {string} loginUrl
+ * @property {string} [challengeUrl]
  * @property {string} [reason]
+ * @property {ProviderMetadata} [metadata]
  */
 
 /**
@@ -52,25 +87,30 @@ export async function checkSession({
   signal,
   onLog,
 } = {}) {
-  const defaultLoginUrls = {
-    chatgpt: 'https://chatgpt.com/auth/login',
-    claude: 'https://claude.ai/login',
-    gemini: 'https://gemini.google.com/',
-  }
-
   const entries = await Promise.all(
     targetProviders.map(async (name) => {
       const provider = getProvider(name)
+      const metadata = provider.metadata
       try {
         const result = await provider.checkAuth({ mode, signal, onLog })
-        return [name, result]
+        return [
+          name,
+          {
+            loginUrl: metadata?.loginUrl || 'https://google.com',
+            challengeUrl: metadata?.challengeUrl,
+            metadata,
+            ...result,
+          },
+        ]
       } catch (err) {
         return [
           name,
           {
             authenticated: false,
-            loginUrl: defaultLoginUrls[name] || 'https://google.com',
+            loginUrl: metadata?.loginUrl || 'https://google.com',
+            challengeUrl: metadata?.challengeUrl,
             reason: err.message || String(err),
+            metadata,
           },
         ]
       }
@@ -95,5 +135,16 @@ export async function checkSession({
  */
 export async function sendPrompt(providerName, prompt, { onChunk, signal, onLog } = {}) {
   const provider = getProvider(providerName)
-  return provider.sendPrompt(prompt, { onChunk, signal, onLog })
+  try {
+    return await provider.sendPrompt(prompt, { onChunk, signal, onLog })
+  } catch (err) {
+    if (provider.metadata) {
+      if (err.code === 'AUTH_REQUIRED' && !err.actionUrl) {
+        err.actionUrl = provider.metadata.loginUrl
+      } else if (err.code === 'CLOUDFLARE_CHALLENGE' && !err.actionUrl) {
+        err.actionUrl = provider.metadata.challengeUrl
+      }
+    }
+    throw err
+  }
 }

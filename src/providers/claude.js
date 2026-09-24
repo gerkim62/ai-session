@@ -18,6 +18,15 @@ import { createLogger } from '../utils/log.js'
 import { generateUUID } from '../utils/crypto.js'
 import { buildCookieString, assertOk, createHttpError } from '../utils/http.js'
 
+export const metadata = {
+  id: 'claude',
+  displayName: 'Claude (claude.ai)',
+  shortName: 'Claude',
+  loginUrl: 'https://claude.ai/login',
+  challengeUrl: 'https://claude.ai/',
+  homeUrl: 'https://claude.ai/',
+}
+
 const log = createLogger('claude')
 
 // --- Helpers ---
@@ -27,7 +36,7 @@ async function getClaudeAuth(onLog) {
   log(onLog, 'debug', 'COOKIE', 'Retrieved all cookies for https://claude.ai/', cookies)
   const sessionCookie = cookies.find((c) => c.name === 'sessionKey')
   if (!sessionCookie?.value) {
-    throw createHttpError('Claude: Not logged in. Please log in at https://claude.ai', null, 'claude', 'AUTH_REQUIRED')
+    throw createHttpError('Claude: Not logged in. Please log in at https://claude.ai', null, 'claude', 'AUTH_REQUIRED', metadata.loginUrl)
   }
   const cookieStr = buildCookieString(cookies)
   return { sessionKey: sessionCookie.value, cookieStr }
@@ -60,7 +69,7 @@ async function getOrganizationId(cookieStr, onLog) {
   }
   const orgs = JSON.parse(text)
   log(onLog, 'info', 'NETWORK_RESPONSE', 'Retrieved Claude organizations list', orgs)
-  if (!orgs?.length) throw createHttpError('Claude: No organizations found', null, 'claude', 'AUTH_REQUIRED')
+  if (!orgs?.length) throw createHttpError('Claude: No organizations found', null, 'claude', 'AUTH_REQUIRED', metadata.loginUrl)
   return orgs[0].uuid
 }
 
@@ -186,6 +195,13 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
     return fullResponse
   } catch (err) {
     if (err && !err.provider) err.provider = 'claude'
+    if (err) {
+      if (err.code === 'AUTH_REQUIRED' && !err.actionUrl) {
+        err.actionUrl = metadata.loginUrl
+      } else if (err.code === 'CLOUDFLARE_CHALLENGE' && !err.actionUrl) {
+        err.actionUrl = metadata.challengeUrl
+      }
+    }
     log(onLog, 'error', 'ERROR', `Claude failed: ${err.message || String(err)}`, { stack: err.stack })
     throw err
   } finally {
@@ -201,7 +217,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
  * @param {'cookie' | 'network'} [options.mode='cookie'] - 'cookie' for fast passive inspection, 'network' to ping /api/organizations
  * @param {AbortSignal} [options.signal]
  * @param {(entry: import('../utils/log.js').LogEntry) => void} [options.onLog]
- * @returns {Promise<{ authenticated: boolean, loginUrl: string, reason?: string }>}
+ * @returns {Promise<{ authenticated: boolean, loginUrl: string, challengeUrl?: string, reason?: string, metadata?: import('../index.js').ProviderMetadata }>}
  */
 export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
   try {
@@ -212,8 +228,10 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       log(onLog, 'warn', 'AUTH_CHECK_FAIL', 'checkAuth: missing sessionKey cookie')
       return {
         authenticated: false,
-        loginUrl: 'https://claude.ai/login',
+        loginUrl: metadata.loginUrl,
+        challengeUrl: metadata.challengeUrl,
         reason: 'Missing sessionKey cookie',
+        metadata,
       }
     }
 
@@ -233,8 +251,10 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
         log(onLog, 'warn', 'AUTH_CHECK_FAIL', `checkAuth: Claude organizations responded with HTTP ${resp.status}`, { status: resp.status })
         return {
           authenticated: false,
-          loginUrl: 'https://claude.ai/login',
+          loginUrl: metadata.loginUrl,
+          challengeUrl: metadata.challengeUrl,
           reason,
+          metadata,
         }
       }
       const text = await resp.text().catch(() => '')
@@ -242,8 +262,10 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
         log(onLog, 'warn', 'REGION_BLOCK', 'checkAuth: Claude not available in your region')
         return {
           authenticated: false,
-          loginUrl: 'https://claude.ai/',
+          loginUrl: metadata.homeUrl,
+          challengeUrl: metadata.challengeUrl,
           reason: 'Not available in your region',
+          metadata,
         }
       }
       let orgs
@@ -256,8 +278,10 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
         log(onLog, 'warn', 'AUTH_CHECK_FAIL', 'checkAuth: No organizations found')
         return {
           authenticated: false,
-          loginUrl: 'https://claude.ai/',
+          loginUrl: metadata.homeUrl,
+          challengeUrl: metadata.challengeUrl,
           reason: 'No organizations found',
+          metadata,
         }
       }
     }
@@ -265,14 +289,18 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
     log(onLog, 'info', 'AUTH_CHECK_SUCCESS', 'checkAuth: Claude authenticated successfully')
     return {
       authenticated: true,
-      loginUrl: 'https://claude.ai/',
+      loginUrl: metadata.homeUrl,
+      challengeUrl: metadata.challengeUrl,
+      metadata,
     }
   } catch (err) {
     log(onLog, 'error', 'AUTH_CHECK_ERROR', `Claude checkAuth error: ${err.message}`, { error: err.message })
     return {
       authenticated: false,
-      loginUrl: 'https://claude.ai/login',
+      loginUrl: metadata.loginUrl,
+      challengeUrl: metadata.challengeUrl,
       reason: err.message,
+      metadata,
     }
   }
 }

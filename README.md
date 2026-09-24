@@ -149,6 +149,7 @@ Errors thrown during prompt execution or auth checks carry structured metadata o
 | `err.status` | `number \| null` | HTTP response status (e.g. `401`, `403`, `429`), or `null` for pre-network failures |
 | `err.code` | `string` | Machine-readable error code (`AUTH_REQUIRED`, `FORBIDDEN`, `CLOUDFLARE_CHALLENGE`, `RATE_LIMITED`, `HTTP_ERROR`) |
 | `err.provider`| `string` | Associated provider identifier (`'chatgpt'`, `'claude'`, or `'gemini'`) |
+| `err.actionUrl`| `string \| undefined` | Actionable resolution URL (e.g. login URL on `AUTH_REQUIRED`, challenge URL on `CLOUDFLARE_CHALLENGE`) |
 
 Example consumer error handling:
 
@@ -157,15 +158,42 @@ try {
   await sendPrompt('chatgpt', prompt)
 } catch (err) {
   if (err.code === 'AUTH_REQUIRED' || err.status === 401) {
-    // Prompt user to log in via err.loginUrl or show actionable sign-in modal
+    // Prompt user to log in; open target URL directly:
+    if (err.actionUrl) chrome.tabs.create({ url: err.actionUrl })
   } else if (err.code === 'CLOUDFLARE_CHALLENGE') {
-    // Notify user to open tab and pass human challenge (e.g. Cloudflare Turnstile)
+    // Open challenge URL for user to pass human verification:
+    if (err.actionUrl) chrome.tabs.create({ url: err.actionUrl })
   } else if (err.code === 'FORBIDDEN' || err.status === 403) {
     // Permission denied / region restriction
   } else if (err.code === 'RATE_LIMITED' || err.status === 429) {
     // Handle backoff / throttling
   }
 }
+```
+
+### 6. Static Provider Metadata
+
+Inspect provider details (display names, login URLs, challenge URLs, home URLs) without triggering network or cookie calls:
+
+```javascript
+import { getProviderMetadata, getAllProvidersMetadata, chatgpt } from 'ai-session-free'
+
+// Access static metadata for a specific provider
+const meta = getProviderMetadata('chatgpt')
+// Or from the module directly:
+// chatgpt.metadata
+console.log(meta)
+// {
+//   id: 'chatgpt',
+//   displayName: 'ChatGPT (chatgpt.com)',
+//   shortName: 'ChatGPT',
+//   loginUrl: 'https://chatgpt.com/auth/login',
+//   challengeUrl: 'https://chatgpt.com/',
+//   homeUrl: 'https://chatgpt.com/'
+// }
+
+// Or inspect all registered providers:
+const allMeta = getAllProvidersMetadata()
 ```
 
 ---

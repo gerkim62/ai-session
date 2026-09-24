@@ -106,6 +106,7 @@ chrome.runtime.onConnect.addListener((port) => {
             error: err.message || String(err),
             status: err.status ?? null,
             code: err.code || null,
+            actionUrl: err.actionUrl || null,
           })
         } catch {
           // Port disconnected

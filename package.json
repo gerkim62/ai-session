@@ -4,8 +4,13 @@
   "description": "Headless web session AI client for ChatGPT, Claude, and Gemini — no API keys required",
   "type": "module",
   "main": "./src/index.js",
+  "types": "./index.d.ts",
   "exports": {
-    ".": "./src/index.js",
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
     "./chatgpt": "./src/providers/chatgpt.js",
     "./claude": "./src/providers/claude.js",
     "./gemini": "./src/providers/gemini.js",
@@ -13,6 +18,7 @@
   },
   "files": [
     "src",
+    "index.d.ts",
     "rules.json",
     "README.md"
   ],

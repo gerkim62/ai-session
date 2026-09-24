@@ -21,6 +21,15 @@ import { createLogger } from '../utils/log.js'
 import { generateUUID } from '../utils/crypto.js'
 import { buildCookieString, createHttpError } from '../utils/http.js'
 
+export const metadata = {
+  id: 'chatgpt',
+  displayName: 'ChatGPT (chatgpt.com)',
+  shortName: 'ChatGPT',
+  loginUrl: 'https://chatgpt.com/auth/login',
+  challengeUrl: 'https://chatgpt.com/',
+  homeUrl: 'https://chatgpt.com/',
+}
+
 const log = createLogger('chatgpt')
 
 // --- Cookie / Token helpers ---
@@ -53,7 +62,7 @@ async function getAccessToken(onLog) {
   })
 
   if (resp.status === 403) {
-    throw createHttpError('ChatGPT: Cloudflare block. Try opening chatgpt.com in a tab first.', 403, 'chatgpt', 'CLOUDFLARE_CHALLENGE')
+    throw createHttpError('ChatGPT: Cloudflare block. Try opening chatgpt.com in a tab first.', 403, 'chatgpt', 'CLOUDFLARE_CHALLENGE', metadata.challengeUrl)
   }
   if (!resp.ok) {
     throw createHttpError(`ChatGPT: HTTP ${resp.status}`, resp.status, 'chatgpt')
@@ -61,7 +70,7 @@ async function getAccessToken(onLog) {
   const data = await resp.json().catch(() => ({}))
   log(onLog, 'debug', 'AUTH', 'Parsed session response data', data)
   if (!data.accessToken) {
-    throw createHttpError('ChatGPT: Not logged in. Please log in at https://chatgpt.com', null, 'chatgpt', 'AUTH_REQUIRED')
+    throw createHttpError('ChatGPT: Not logged in. Please log in at https://chatgpt.com', null, 'chatgpt', 'AUTH_REQUIRED', metadata.loginUrl)
   }
   return data.accessToken
 }
@@ -309,6 +318,12 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
       errMsg = 'ChatGPT: Security challenge (HTTP 403: Unusual activity). Please keep https://chatgpt.com open in an active tab, refresh it or send a message there, and try again.'
       err.code = 'CLOUDFLARE_CHALLENGE'
       err.status = err.status || 403
+      err.actionUrl = metadata.challengeUrl
+    }
+    if (err.code === 'AUTH_REQUIRED' && !err.actionUrl) {
+      err.actionUrl = metadata.loginUrl
+    } else if (err.code === 'CLOUDFLARE_CHALLENGE' && !err.actionUrl) {
+      err.actionUrl = metadata.challengeUrl
     }
     err.message = errMsg
     if (!err.provider) err.provider = 'chatgpt'
@@ -325,7 +340,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
  * @param {'cookie' | 'network'} [options.mode='cookie'] - 'cookie' for fast passive inspection, 'network' to ping /api/auth/session
  * @param {AbortSignal} [options.signal]
  * @param {(entry: import('../utils/log.js').LogEntry) => void} [options.onLog]
- * @returns {Promise<{ authenticated: boolean, loginUrl: string, reason?: string }>}
+ * @returns {Promise<{ authenticated: boolean, loginUrl: string, challengeUrl?: string, reason?: string, metadata?: import('../index.js').ProviderMetadata }>}
  */
 export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
   try {
@@ -336,8 +351,10 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       log(onLog, 'warn', 'AUTH_CHECK_FAIL', 'checkAuth: missing session-token cookie')
       return {
         authenticated: false,
-        loginUrl: 'https://chatgpt.com/auth/login',
+        loginUrl: metadata.loginUrl,
+        challengeUrl: metadata.challengeUrl,
         reason: 'Missing session token cookie',
+        metadata,
       }
     }
 
@@ -357,8 +374,10 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
         log(onLog, 'warn', 'SECURITY_CHALLENGE', 'checkAuth: ChatGPT returned HTTP 403 (Cloudflare challenge)')
         return {
           authenticated: false,
-          loginUrl: 'https://chatgpt.com/',
+          loginUrl: metadata.loginUrl,
+          challengeUrl: metadata.challengeUrl,
           reason: 'Cloudflare challenge',
+          metadata,
         }
       }
 
@@ -368,7 +387,9 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
           log(onLog, 'info', 'AUTH_CHECK_SUCCESS', 'checkAuth: ChatGPT authenticated successfully')
           return {
             authenticated: true,
-            loginUrl: 'https://chatgpt.com/',
+            loginUrl: metadata.homeUrl,
+            challengeUrl: metadata.challengeUrl,
+            metadata,
           }
         }
       }
@@ -376,22 +397,28 @@ export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
       log(onLog, 'warn', 'AUTH_CHECK_FAIL', `checkAuth: ChatGPT session endpoint returned HTTP ${resp.status} without accessToken`)
       return {
         authenticated: false,
-        loginUrl: 'https://chatgpt.com/auth/login',
+        loginUrl: metadata.loginUrl,
+        challengeUrl: metadata.challengeUrl,
         reason: `Unauthenticated (HTTP ${resp.status})`,
+        metadata,
       }
     }
 
     log(onLog, 'info', 'AUTH_CHECK_SUCCESS', 'checkAuth: ChatGPT authenticated successfully')
     return {
       authenticated: true,
-      loginUrl: 'https://chatgpt.com/',
+      loginUrl: metadata.homeUrl,
+      challengeUrl: metadata.challengeUrl,
+      metadata,
     }
   } catch (err) {
     log(onLog, 'error', 'AUTH_CHECK_ERROR', `ChatGPT checkAuth error: ${err.message}`, { error: err.message })
     return {
       authenticated: false,
-      loginUrl: 'https://chatgpt.com/auth/login',
+      loginUrl: metadata.loginUrl,
+      challengeUrl: metadata.challengeUrl,
       reason: err.message,
+      metadata,
     }
   }
 }
