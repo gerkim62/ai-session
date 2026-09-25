@@ -17,6 +17,8 @@
     "./kimi": "./src/providers/kimi.js",
     "./copilot": "./src/providers/copilot.js",
     "./deepseek": "./src/providers/deepseek.js",
+    "./bridge": "./src/bridge.js",
+    "./rules": "./src/utils/rules.js",
     "./rules.json": "./rules.json"
   },
   "files": [

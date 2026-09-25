@@ -137,3 +137,25 @@ export function sendPrompt(
   prompt: string,
   options?: PromptOptions & Record<string, any>
 ): Promise<string>;
+
+/**
+ * Array of declarativeNetRequest rule definitions for Origin/Referer spoofing.
+ */
+export const NET_RULES: Array<any>;
+
+/**
+ * Automatically registers or refreshes dynamic declarativeNetRequest rules in Chrome MV3.
+ */
+export function setupDynamicRules(): Promise<boolean>;
+
+/**
+ * Ensures dynamic rules are installed once in the current background session.
+ */
+export function ensureDynamicRules(): Promise<void>;
+
+/**
+ * Opt-out: disable automatic dynamic rule registration if the host extension
+ * prefers to manage DNR rules exclusively through its own static rulesets.
+ */
+export function disableDynamicRules(): void;
+

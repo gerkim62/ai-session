@@ -11,9 +11,11 @@ import * as gemini from './providers/gemini.js'
 import * as kimi from './providers/kimi.js'
 import * as copilot from './providers/copilot.js'
 import * as deepseek from './providers/deepseek.js'
+import { NET_RULES, setupDynamicRules, ensureDynamicRules, disableDynamicRules } from './utils/rules.js'
 
 export { chatgpt, claude, gemini, kimi, copilot, deepseek }
 export { createHttpError } from './utils/http.js'
+export { NET_RULES, setupDynamicRules, ensureDynamicRules, disableDynamicRules }
 
 export const providers = {
   chatgpt,
@@ -93,6 +95,7 @@ export async function checkSession({
   signal,
   onLog,
 } = {}) {
+  await ensureDynamicRules()
   const entries = await Promise.all(
     targetProviders.map(async (name) => {
       const provider = getProvider(name)
@@ -140,6 +143,7 @@ export async function checkSession({
  * @returns {Promise<string>}
  */
 export async function sendPrompt(providerName, prompt, { onChunk, signal, onLog, ...rest } = {}) {
+  await ensureDynamicRules()
   const provider = getProvider(providerName)
   try {
     return await provider.sendPrompt(prompt, { onChunk, signal, onLog, ...rest })
