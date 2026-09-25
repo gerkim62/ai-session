@@ -47,7 +47,30 @@ async function getStoredToken() {
 
 /**
  * Obtain a valid DeepSeek user token.
+/**
+ * Decode JWT expiration timestamp without external dependencies.
+ * @param {string} jwt
+ * @returns {number | null} Expiration timestamp in seconds, or null if not a parseable JWT
+ */
+function getJwtExp(jwt) {
+  if (typeof jwt !== 'string') return null
+  const parts = jwt.split('.')
+  if (parts.length < 2) return null
+  try {
+    const raw = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = raw.padEnd(raw.length + ((4 - (raw.length % 4)) % 4), '=')
+    const decoded = typeof atob === 'function' ? atob(padded) : Buffer.from(padded, 'base64').toString('binary')
+    const payload = JSON.parse(decoded)
+    return typeof payload.exp === 'number' ? payload.exp : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Obtain a valid DeepSeek user token.
  * @param {string} [tokenOverride]
+ * @param {Function} [onLog]
  * @returns {Promise<string>}
  */
 async function getValidToken(tokenOverride, onLog) {
@@ -66,7 +89,27 @@ async function getValidToken(tokenOverride, onLog) {
       metadata.loginUrl,
     )
   }
-  log(onLog, 'debug', 'STORAGE', 'Retrieved DeepSeek userToken from storage')
+
+  // Fast client-side JWT expiration check
+  const exp = getJwtExp(token)
+  if (exp) {
+    const now = Math.floor(Date.now() / 1000)
+    if (now >= exp - 30) {
+      log(onLog, 'warn', 'AUTH', 'DeepSeek userToken in storage is expired', {
+        exp: new Date(exp * 1000).toISOString(),
+        now: new Date().toISOString(),
+      })
+      throw createHttpError(
+        'DeepSeek: Session token has expired. Please open DeepSeek (https://chat.deepseek.com) to refresh your session.',
+        null,
+        'deepseek',
+        'AUTH_REQUIRED',
+        metadata.loginUrl,
+      )
+    }
+  }
+
+  log(onLog, 'debug', 'STORAGE', 'Retrieved valid DeepSeek userToken from storage')
   return token
 }
 
@@ -90,24 +133,47 @@ async function createChatSession(token, { signal, onLog } = {}) {
 
   log(onLog, 'info', 'NETWORK_REQUEST', 'Creating DeepSeek chat session', { url })
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers,
-    signal,
-    body: JSON.stringify({}),
-  })
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      signal,
+      body: JSON.stringify({ agent: 'chat' }),
+    })
 
-  await assertOk(resp, 'DeepSeek createChatSession', { onLog, log, provider: 'deepseek' })
-  const data = await resp.json()
+    await assertOk(resp, 'DeepSeek createChatSession', { onLog, log, provider: 'deepseek' })
+    const data = await resp.json()
 
-  const sessionId = data?.data?.biz_data?.chat_session?.id || data?.data?.biz_data?.id
+    if (data?.code && data.code !== 0) {
+      log(onLog, 'error', 'NETWORK_RESPONSE', `DeepSeek session creation error: ${data.msg || data.code}`, {
+        code: data.code,
+        msg: data.msg,
+      })
+      const isAuth = data.code === 40001 || data.code === 40002
+      throw createHttpError(
+        `DeepSeek: ${data.msg || 'Session creation failed'} (code ${data.code})`,
+        data.code,
+        'deepseek',
+        isAuth ? 'AUTH_REQUIRED' : 'HTTP_ERROR',
+        metadata.loginUrl,
+      )
+    }
 
-  if (!sessionId) {
-    throw createHttpError('DeepSeek: Failed to obtain chat_session_id', resp.status, 'deepseek', 'HTTP_ERROR')
+    const sessionId = data?.data?.biz_data?.chat_session?.id || data?.data?.biz_data?.id
+
+    if (!sessionId) {
+      log(onLog, 'error', 'NETWORK_RESPONSE', 'DeepSeek session creation returned no session ID', { data })
+      throw createHttpError('DeepSeek: Failed to obtain chat_session_id', resp.status, 'deepseek', 'HTTP_ERROR')
+    }
+
+    log(onLog, 'info', 'NETWORK_RESPONSE', 'Created DeepSeek session', { sessionId })
+    return sessionId
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      log(onLog, 'error', 'NETWORK_ERROR', `DeepSeek createChatSession failed: ${err.message}`, { error: err.message, code: err.code })
+    }
+    throw err
   }
-
-  log(onLog, 'info', 'NETWORK_RESPONSE', 'Created DeepSeek session', { sessionId })
-  return sessionId
 }
 
 /**
@@ -123,12 +189,8 @@ async function deleteChatSession(sessionId, token, { onLog } = {}) {
     log(onLog, 'info', 'NETWORK_REQUEST', 'Deleting temporary DeepSeek session', { sessionId })
     const resp = await fetch(url, {
       method: 'POST',
-      headers: {
-        Accept: '*/*',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        Origin: DEEPSEEK_BASE,
-      },
+      headers,
+      signal,
       body: JSON.stringify({ chat_session_id: sessionId }),
     })
     log(onLog, 'debug', 'NETWORK_RESPONSE', 'Deleted temporary DeepSeek session', { status: resp.status })
@@ -157,29 +219,53 @@ async function getPowResponse(token, { signal, onLog } = {}) {
 
   log(onLog, 'info', 'NETWORK_REQUEST', 'Requesting DeepSeek PoW challenge', { url })
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers,
-    signal,
-    body: JSON.stringify({ target_path: '/api/v0/chat/completion' }),
-  })
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      signal,
+      body: JSON.stringify({ target_path: '/api/v0/chat/completion' }),
+    })
 
-  await assertOk(resp, 'DeepSeek create_pow_challenge', { onLog, log, provider: 'deepseek' })
-  const data = await resp.json()
-  const challenge = data?.data?.biz_data?.challenge
+    await assertOk(resp, 'DeepSeek create_pow_challenge', { onLog, log, provider: 'deepseek' })
+    const data = await resp.json()
 
-  if (!challenge) {
-    throw createHttpError('DeepSeek: Missing PoW challenge in response', resp.status, 'deepseek', 'HTTP_ERROR')
+    if (data?.code && data.code !== 0) {
+      log(onLog, 'error', 'NETWORK_RESPONSE', `DeepSeek PoW challenge error: ${data.msg || data.code}`, {
+        code: data.code,
+        msg: data.msg,
+      })
+      const isAuth = data.code === 40001 || data.code === 40002
+      throw createHttpError(
+        `DeepSeek: ${data.msg || 'PoW challenge request failed'} (code ${data.code})`,
+        data.code,
+        'deepseek',
+        isAuth ? 'AUTH_REQUIRED' : 'HTTP_ERROR',
+        metadata.loginUrl,
+      )
+    }
+
+    const challenge = data?.data?.biz_data?.challenge
+
+    if (!challenge) {
+      log(onLog, 'error', 'NETWORK_RESPONSE', 'DeepSeek PoW challenge missing from response', { data })
+      throw createHttpError('DeepSeek: Missing PoW challenge in response', resp.status, 'deepseek', 'HTTP_ERROR')
+    }
+
+    log(onLog, 'info', 'POW_CHALLENGE', 'Solving DeepSeek PoW challenge', {
+      algorithm: challenge.algorithm,
+      difficulty: challenge.difficulty,
+    })
+
+    const solved = await solveDeepSeekPoW(challenge)
+    log(onLog, 'info', 'POW_SOLVED', 'DeepSeek PoW solved successfully')
+    return solved
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      log(onLog, 'error', 'NETWORK_ERROR', `DeepSeek getPowResponse failed: ${err.message}`, { error: err.message, code: err.code })
+    }
+    throw err
   }
-
-  log(onLog, 'info', 'POW_CHALLENGE', 'Solving DeepSeek PoW challenge', {
-    algorithm: challenge.algorithm,
-    difficulty: challenge.difficulty,
-  })
-
-  const solved = await solveDeepSeekPoW(challenge)
-  log(onLog, 'info', 'POW_SOLVED', 'DeepSeek PoW solved successfully')
-  return solved
 }
 
 /**
@@ -205,6 +291,19 @@ export async function checkAuth({ mode = 'cookie', signal, onLog, token } = {}) 
       }
     }
 
+    // Check JWT expiration if parseable
+    const exp = getJwtExp(activeToken)
+    if (exp) {
+      const now = Math.floor(Date.now() / 1000)
+      if (now >= exp - 30) {
+        return {
+          authenticated: false,
+          loginUrl: metadata.loginUrl,
+          reason: 'DeepSeek session token has expired. Please open DeepSeek (https://chat.deepseek.com) to refresh.',
+        }
+      }
+    }
+
     if (mode === 'cookie') {
       return { authenticated: true, loginUrl: metadata.loginUrl }
     }
@@ -224,6 +323,15 @@ export async function checkAuth({ mode = 'cookie', signal, onLog, token } = {}) 
         authenticated: false,
         loginUrl: metadata.loginUrl,
         reason: `HTTP ${resp.status}: Token rejected`,
+      }
+    }
+
+    const data = await resp.json().catch(() => ({}))
+    if (data?.code && data.code !== 0) {
+      return {
+        authenticated: false,
+        loginUrl: metadata.loginUrl,
+        reason: `${data.msg || 'Token rejected'} (code ${data.code})`,
       }
     }
 
@@ -264,13 +372,20 @@ export async function sendPrompt(
 ) {
   log(onLog, 'info', 'PROMPT_START', 'Starting DeepSeek prompt execution', { prompt })
 
-  const userToken = await getValidToken(token, onLog)
-  const sessionId = await createChatSession(userToken, { signal, onLog })
-  const powResponse = await getPowResponse(userToken, { signal, onLog })
-
+  let sessionId = null
+  let userToken = null
   let fullResponse = ''
 
   try {
+    userToken = await getValidToken(token, onLog)
+
+    // Parallelize session creation and PoW challenge to minimize latency
+    const [createdSessionId, powResponse] = await Promise.all([
+      createChatSession(userToken, { signal, onLog }),
+      getPowResponse(userToken, { signal, onLog }),
+    ])
+    sessionId = createdSessionId
+
     const streamUrl = `${DEEPSEEK_BASE}/api/v0/chat/completion`
     const body = {
       chat_session_id: sessionId,
@@ -355,10 +470,13 @@ export async function sendPrompt(
     if (err && err.code === 'AUTH_REQUIRED' && !err.actionUrl) {
       err.actionUrl = metadata.loginUrl
     }
-    log(onLog, 'error', 'ERROR', `DeepSeek failed: ${err.message || String(err)}`, { stack: err.stack })
+    log(onLog, 'error', 'PROMPT_ERROR', `DeepSeek prompt execution failed: ${err.message || String(err)}`, {
+      code: err.code || null,
+      status: err.status || null,
+    })
     throw err
   } finally {
-    if (temporary) {
+    if (temporary && sessionId && userToken) {
       await deleteChatSession(sessionId, userToken, { onLog })
     }
   }

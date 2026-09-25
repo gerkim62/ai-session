@@ -98,6 +98,29 @@ chrome.runtime.onConnect.addListener((port) => {
           provider: providerName,
         })
       } else {
+        if (debug) {
+          try {
+            port.postMessage({
+              type: 'DEBUG_LOG',
+              requestId,
+              provider: providerName,
+              entry: {
+                timestamp: new Date().toISOString(),
+                provider: providerName,
+                level: 'error',
+                category: 'PROMPT_ERROR',
+                message: err.message || String(err),
+                data: {
+                  code: err.code || null,
+                  status: err.status || null,
+                  actionUrl: err.actionUrl || null,
+                },
+              },
+            })
+          } catch {
+            // Port disconnected
+          }
+        }
         try {
           port.postMessage({
             type: 'ERROR',
