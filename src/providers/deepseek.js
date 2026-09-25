@@ -185,12 +185,18 @@ async function createChatSession(token, { signal, onLog } = {}) {
  */
 async function deleteChatSession(sessionId, token, { onLog } = {}) {
   const url = `${DEEPSEEK_BASE}/api/v0/chat_session/delete`
+  const headers = {
+    Accept: '*/*',
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+    Origin: DEEPSEEK_BASE,
+    Referer: `${DEEPSEEK_BASE}/`,
+  }
   try {
     log(onLog, 'info', 'NETWORK_REQUEST', 'Deleting temporary DeepSeek session', { sessionId })
     const resp = await fetch(url, {
       method: 'POST',
       headers,
-      signal,
       body: JSON.stringify({ chat_session_id: sessionId }),
     })
     log(onLog, 'debug', 'NETWORK_RESPONSE', 'Deleted temporary DeepSeek session', { status: resp.status })
@@ -365,16 +371,17 @@ export async function sendPrompt(
     signal,
     onLog,
     thinking = false,
-    search = true,
+    search = false,
     temporary = true,
     token,
   } = {},
 ) {
-  log(onLog, 'info', 'PROMPT_START', 'Starting DeepSeek prompt execution', { prompt })
+  log(onLog, 'info', 'PROMPT_START', 'Starting DeepSeek prompt execution', { prompt, thinking, search })
 
   let sessionId = null
   let userToken = null
   let fullResponse = ''
+  let isFinished = false
 
   try {
     userToken = await getValidToken(token, onLog)
@@ -417,6 +424,7 @@ export async function sendPrompt(
       signal,
       onLog,
       onMessage: (message) => {
+        if (isFinished) return
         const raw = typeof message === 'string' ? message : message?.data
         if (!raw) return
         if (raw.trim() === '[DONE]') return
@@ -430,17 +438,69 @@ export async function sendPrompt(
             throw createHttpError(`DeepSeek: ${errMsg}`, parsed.code || null, 'deepseek', 'HTTP_ERROR')
           }
 
-          // Content chunk from fragments
-          const val = parsed.v
-          const path = parsed.p || ''
-
-          if (typeof val === 'string' && val) {
-            // Check if it is regular response content or thinking
-            if (path.includes('fragments') || path.includes('content')) {
-              fullResponse += val
-              log(onLog, 'debug', 'STREAM', 'Accumulated response text', { delta: val, length: fullResponse.length })
-              if (onChunk) onChunk(fullResponse)
+          // Handle completion status signal
+          if (parsed.p === 'response/status') {
+            log(onLog, 'debug', 'STATUS', `DeepSeek response status: ${parsed.v}`, { status: parsed.v })
+            if (parsed.v === 'COMPLETED' || parsed.v === 'FINISHED') {
+              isFinished = true
+              return
             }
+          }
+
+          // Handle session title generation event
+          const path = String(parsed.p || '')
+          if (path.includes('title') || path.includes('session') || path.includes('conversation')) {
+            log(onLog, 'debug', 'TITLE', 'DeepSeek generated session title', { title: parsed.v })
+            return
+          }
+
+          // Extract delta from multiple supported SSE response schemas
+          let delta = ''
+          if (typeof parsed.choices?.[0]?.delta?.content === 'string') {
+            delta = parsed.choices[0].delta.content
+          } else if (typeof parsed.choices?.[0]?.text === 'string') {
+            delta = parsed.choices[0].text
+          } else if (typeof parsed.delta?.content === 'string') {
+            delta = parsed.delta.content
+          } else if (typeof parsed.content === 'string') {
+            delta = parsed.content
+          } else if (typeof parsed.text === 'string') {
+            delta = parsed.text
+          } else if (typeof parsed.v === 'string') {
+            const isNonContent = path.includes('status') || path.includes('search_query') || path.includes('meta')
+            if (!isNonContent) {
+              delta = parsed.v
+            }
+          } else if (Array.isArray(parsed.v)) {
+            for (const item of parsed.v) {
+              if (typeof item === 'string') delta += item
+              else if (item && typeof item.content === 'string') delta += item.content
+              else if (item && typeof item.text === 'string') delta += item.text
+            }
+          } else if (parsed.v && typeof parsed.v === 'object') {
+            const frags = parsed.v?.response?.fragments || parsed.v?.fragments || parsed.response?.fragments
+            if (Array.isArray(frags)) {
+              for (const frag of frags) {
+                if (typeof frag?.content === 'string') delta += frag.content
+                else if (typeof frag?.text === 'string') delta += frag.text
+              }
+            } else if (typeof parsed.v.content === 'string') {
+              delta = parsed.v.content
+            } else if (typeof parsed.v.text === 'string') {
+              delta = parsed.v.text
+            }
+          }
+
+          if (delta) {
+            fullResponse += delta
+            log(onLog, 'debug', 'STREAM', 'Accumulated response text', { delta, length: fullResponse.length })
+            if (onChunk) onChunk(fullResponse)
+          } else {
+            log(onLog, 'debug', 'STREAM_MSG', 'Non-content SSE event', {
+              p: parsed.p || null,
+              keys: Object.keys(parsed),
+              v: parsed.v,
+            })
           }
         } catch (e) {
           if (e.provider === 'deepseek') throw e

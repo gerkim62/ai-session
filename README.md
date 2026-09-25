@@ -199,6 +199,9 @@ Any Chrome extension consuming this library must include the following permissio
       }
     ]
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "content_scripts": [
     {
       "matches": ["https://*.kimi.moonshot.cn/*", "https://*.kimi.com/*", "https://*.kimi.ai/*"],
