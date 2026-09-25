@@ -17,6 +17,7 @@ ai-session-free/
 ├── check-upstream.sh         # Upstream integrity audit script (dev only)
 ├── src/                      # Library Core (pure ESM)
 │   ├── index.js              # Unified entry: exports sendPrompt & all 6 providers
+│   ├── bridge.js             # Universal web token bridge for content scripts
 │   ├── providers/
 │   │   ├── chatgpt.js        # sendPrompt(prompt, { onChunk, signal } = {})
 │   │   ├── claude.js         # sendPrompt(prompt, { onChunk, signal } = {})
@@ -29,6 +30,7 @@ ai-session-free/
 │       ├── deepseek-pow.js   # Embedded SHA3-256 WASM PoW solver for DeepSeek
 │       ├── http.js           # Shared cookie string / HTTP error helpers
 │       ├── log.js            # Shared structured logger factory
+│       ├── rules.js          # Dynamic DeclarativeNetRequest rules (collision-free 91001-91007)
 │       └── sse-parser.js     # SSE streaming fetch helper (powered by eventsource-parser)
 └── sample-extension/         # Working sample Chrome Extension (Vite)
     ├── package.json          # Depends on "ai-session-free": "workspace:*"
@@ -89,6 +91,8 @@ Subpaths available:
 - `ai-session-free/kimi`
 - `ai-session-free/copilot`
 - `ai-session-free/deepseek`
+- `ai-session-free/bridge` (universal token bridge for content scripts)
+- `ai-session-free/rules` (declarativeNetRequest rules & dynamic helpers)
 
 ### 2. Root Dispatcher Import
 Import the root module when you need dynamic model selection:
@@ -166,9 +170,17 @@ Errors thrown during prompt execution or auth checks carry structured metadata o
 
 ---
 
-## Required Extension Permissions
+## Extension Integration Guide (Zero-Copy)
 
-Any Chrome extension consuming this library must include the following permissions in its `manifest.json`:
+Integrating `ai-session-free` into any Chrome extension requires **zero manual file copying**:
+- **No copying `rules.json`**: Network header spoofing is managed automatically via dynamic rules.
+- **No copying bridge scripts**: Token synchronization is bundled directly into `'ai-session-free/bridge'`.
+
+---
+
+### 1. Minimal `manifest.json` Configuration
+
+Add the required permissions, host permissions, and WebAssembly CSP to your extension's `manifest.json`:
 
 ```json
 {
@@ -183,41 +195,116 @@ Any Chrome extension consuming this library must include the following permissio
     "https://claude.ai/*",
     "https://*.google.com/*",
     "https://gemini.google.com/*",
-    "https://*.moonshot.cn/*",
-    "https://*.kimi.com/*",
     "https://*.kimi.ai/*",
+    "https://*.kimi.com/*",
+    "https://*.kimi.moonshot.cn/*",
     "https://*.bing.com/*",
-    "https://*.copilot.microsoft.com/*",
-    "https://*.deepseek.com/*"
+    "https://copilot.microsoft.com/*",
+    "https://chat.deepseek.com/*"
   ],
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "ruleset",
-        "enabled": true,
-        "path": "rules.json"
-      }
-    ]
-  },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
-  },
+  }
+}
+```
+
+> [!NOTE]
+> - `"storage"` is used by the token bridge to cache Web `localStorage` credentials for Kimi and DeepSeek.
+> - `'wasm-unsafe-eval'` in `content_security_policy` is required to run DeepSeek's embedded high-speed WebAssembly Proof-of-Work (PoW) solver.
+> - **No static `rules.json` or `rule_resources` declaration is required.**
+
+---
+
+### 2. Token Bridge Integration (`ai-session-free/bridge`)
+
+While ChatGPT, Claude, Gemini, and Copilot authenticate using browser cookies (`chrome.cookies`), **Kimi** and **DeepSeek** store their auth tokens (`refresh_token` and `userToken`) in web `localStorage`. Chrome extensions cannot read cross-origin web `localStorage` directly from background service workers.
+
+`ai-session-free/bridge` automatically detects when the user is on Kimi or DeepSeek, extracts their session tokens, and syncs them seamlessly to `chrome.storage.local`.
+
+#### Case A: If your extension already has a content script (e.g. matching `<all_urls>`)
+Add a single line to your existing content script (e.g. `src/content.tsx` or `src/content.js`):
+
+```typescript
+import 'ai-session-free/bridge';
+```
+
+#### Case B: If your extension does not have an existing content script
+Register a content script targeting the Kimi and DeepSeek domains in your `manifest.json`:
+
+```json
+{
   "content_scripts": [
     {
-      "matches": ["https://*.kimi.moonshot.cn/*", "https://*.kimi.com/*", "https://*.kimi.ai/*"],
-      "js": ["content-scripts/kimi-bridge.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://*.deepseek.com/*"],
-      "js": ["content-scripts/deepseek-bridge.js"],
+      "matches": [
+        "https://*.kimi.ai/*",
+        "https://*.kimi.com/*",
+        "https://*.kimi.moonshot.cn/*",
+        "https://chat.deepseek.com/*"
+      ],
+      "js": ["content-bridge.js"],
       "run_at": "document_idle"
     }
   ]
 }
 ```
+*(Where `content-bridge.js` is bundled from `import 'ai-session-free/bridge'`).*
 
-Copy `rules.json` from the package into your extension's assets so `Origin` and `Referer` headers are properly spoofed in background requests. For Kimi and DeepSeek, also copy the lightweight content scripts from `sample-extension/public/content-scripts/` into your extension so Web `localStorage` authentication tokens sync seamlessly to `chrome.storage.local`.
+---
+
+### 3. Dynamic Network Rules & Rule Coexistence
+
+To prevent CORS and browser origin blocks, requests to AI web endpoints require spoofed `Origin` and `Referer` headers.
+
+`ai-session-free` installs these rules automatically at runtime via `chrome.declarativeNetRequest.updateDynamicRules` whenever `checkSession()` or `sendPrompt()` runs in your background service worker.
+
+#### Coexistence Guarantee with Your Extension's Rules:
+1. **Dedicated Isolated Rule IDs (`91001` – `91007`):** The library registers rules strictly in the `91001–91007` ID range. When refreshing, it passes `removeRuleIds: [91001...91007]` — **it never removes, modifies, or collides with any dynamic rules your extension creates**.
+2. **Strict Domain Scoping:** Rules strictly match only the 6 AI provider domains. Requests to your extension's own backend APIs (e.g. internal servers, SakaHub, etc.) are **never intercepted or modified**.
+3. **Static Ruleset Independence:** If your extension declares its own `rules.json` via `rule_resources`, Chrome isolates static rulesets and dynamic rules in separate namespaces. Both operate concurrently without conflict.
+4. **Self-Healing:** If your extension or another module ever resets dynamic rules, `ai-session-free` automatically verifies `chrome.declarativeNetRequest.getDynamicRules()` and non-destructively re-installs only its own 7 rules.
+
+#### Opt-Out (Manual Rule Management):
+If you prefer to manage all DNR rules yourself in a static `rules.json` file and do not want `ai-session-free` to register dynamic rules, call `disableDynamicRules()` in your background service worker:
+
+```typescript
+import { disableDynamicRules } from 'ai-session-free';
+
+// Disables automatic dynamic rule registration
+disableDynamicRules();
+```
+
+---
+
+### 4. First-Class TypeScript Support
+
+`ai-session-free` provides full TypeScript definitions directly in the package (`index.d.ts`). No custom declaration files or local `.d.ts` workarounds are needed:
+
+```typescript
+import {
+  sendPrompt,
+  checkSession,
+  getProviderMetadata,
+  getAllProvidersMetadata,
+} from 'ai-session-free';
+import type {
+  ProviderName,
+  CheckSessionOptions,
+  PromptOptions,
+  ProviderAuthResult,
+  HttpError,
+} from 'ai-session-free';
+
+// Fully typed session availability check
+const status = await checkSession({ mode: 'network' });
+console.log('Available providers:', status.available);
+
+// Fully typed prompt execution
+const response: string = await sendPrompt('deepseek', 'Review this code', {
+  thinking: true,
+  search: false,
+  onChunk: (text: string) => console.log('Chunk:', text),
+});
+```
 
 ---
 
