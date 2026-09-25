@@ -40,5 +40,61 @@
       "requestDomains": ["gemini.google.com"],
       "resourceTypes": ["xmlhttprequest"]
     }
+  },
+  {
+    "id": 4,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "operation": "set", "header": "origin", "value": "https://kimi.ai" },
+        { "operation": "set", "header": "referer", "value": "https://kimi.ai/" }
+      ]
+    },
+    "condition": {
+      "requestDomains": ["kimi.ai", "www.kimi.ai"],
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  },
+  {
+    "id": 7,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "operation": "set", "header": "origin", "value": "https://www.kimi.com" },
+        { "operation": "set", "header": "referer", "value": "https://www.kimi.com/" }
+      ]
+    },
+    "condition": {
+      "requestDomains": ["kimi.com", "kimi.moonshot.cn", "www.kimi.com"],
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  },
+  {
+    "id": 5,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "operation": "set", "header": "origin", "value": "https://www.bing.com" },
+        { "operation": "set", "header": "referer", "value": "https://www.bing.com/search?q=Bing+AI&showconv=1&FORM=hpcodx" }
+      ]
+    },
+    "condition": {
+      "requestDomains": ["sydney.bing.com", "www.bing.com", "bing.com", "copilot.microsoft.com"],
+      "resourceTypes": ["xmlhttprequest", "websocket"]
+    }
+  },
+  {
+    "id": 6,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "operation": "set", "header": "origin", "value": "https://chat.deepseek.com" },
+        { "operation": "set", "header": "referer", "value": "https://chat.deepseek.com/" }
+      ]
+    },
+    "condition": {
+      "requestDomains": ["chat.deepseek.com"],
+      "resourceTypes": ["xmlhttprequest"]
+    }
   }
 ]

@@ -5,14 +5,21 @@
   "manifest_version": 3,
   "permissions": [
     "cookies",
-    "declarativeNetRequestWithHostAccess"
+    "declarativeNetRequestWithHostAccess",
+    "storage"
   ],
   "host_permissions": [
     "https://*.chatgpt.com/*",
     "https://*.openai.com/*",
     "https://claude.ai/*",
     "https://*.google.com/*",
-    "https://gemini.google.com/*"
+    "https://gemini.google.com/*",
+    "https://*.kimi.com/*",
+    "https://*.kimi.moonshot.cn/*",
+    "https://*.kimi.ai/*",
+    "https://*.bing.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://chat.deepseek.com/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -29,5 +36,23 @@
         "path": "rules.json"
       }
     ]
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.kimi.com/*",
+        "https://*.kimi.moonshot.cn/*",
+        "https://*.kimi.ai/*"
+      ],
+      "js": ["content-scripts/kimi-bridge.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://chat.deepseek.com/*"
+      ],
+      "js": ["content-scripts/deepseek-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }

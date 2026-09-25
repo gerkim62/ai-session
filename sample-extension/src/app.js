@@ -23,21 +23,33 @@ const toggles = {
   chatgpt: document.getElementById('toggle-chatgpt'),
   claude: document.getElementById('toggle-claude'),
   gemini: document.getElementById('toggle-gemini'),
+  kimi: document.getElementById('toggle-kimi'),
+  copilot: document.getElementById('toggle-copilot'),
+  deepseek: document.getElementById('toggle-deepseek'),
 }
 const cols = {
   chatgpt: document.getElementById('col-chatgpt'),
   claude: document.getElementById('col-claude'),
   gemini: document.getElementById('col-gemini'),
+  kimi: document.getElementById('col-kimi'),
+  copilot: document.getElementById('col-copilot'),
+  deepseek: document.getElementById('col-deepseek'),
 }
 const bodies = {
   chatgpt: document.getElementById('body-chatgpt'),
   claude: document.getElementById('body-claude'),
   gemini: document.getElementById('body-gemini'),
+  kimi: document.getElementById('body-kimi'),
+  copilot: document.getElementById('body-copilot'),
+  deepseek: document.getElementById('body-deepseek'),
 }
 const statuses = {
   chatgpt: document.getElementById('status-chatgpt'),
   claude: document.getElementById('status-claude'),
   gemini: document.getElementById('status-gemini'),
+  kimi: document.getElementById('status-kimi'),
+  copilot: document.getElementById('status-copilot'),
+  deepseek: document.getElementById('status-deepseek'),
 }
 
 // Session DOM refs
@@ -51,6 +63,7 @@ const debugDrawer = document.getElementById('debug-drawer')
 const debugToggle = document.getElementById('debug-toggle')
 const debugToggleStatus = document.getElementById('debug-toggle-status')
 const btnDebugClear = document.getElementById('btn-debug-clear')
+const btnDebugCopy = document.getElementById('btn-debug-copy')
 const btnDebugDownload = document.getElementById('btn-debug-download')
 const btnDebugClose = document.getElementById('btn-debug-close')
 const debugStats = document.getElementById('debug-stats')
@@ -95,6 +108,9 @@ function connectPort() {
 
       case 'DONE':
         setStatus(provider, 'done', 'done')
+        if (bodies[provider] && (bodies[provider].querySelector('.loading-dots') || !bodies[provider].textContent.trim())) {
+          setBody(provider, '(No response received)', true)
+        }
         activeProviders.delete(provider)
         checkAllDone()
         break
@@ -138,6 +154,9 @@ function connectPort() {
           chatgpt: 'https://chatgpt.com/auth/login',
           claude: 'https://claude.ai/login',
           gemini: 'https://gemini.google.com/',
+          kimi: 'https://kimi.ai/',
+          copilot: 'https://copilot.microsoft.com/',
+          deepseek: 'https://chat.deepseek.com/',
         }
 
         if (msg.code === 'AUTH_REQUIRED') {
@@ -146,8 +165,18 @@ function connectPort() {
           link.href = defaultLoginUrls[provider] || 'https://google.com'
           link.target = '_blank'
           link.rel = 'noreferrer noopener'
-          link.textContent = `Sign in to ${provider.toUpperCase()} ↗`
-          bodyEl.appendChild(link)
+          if (provider === 'kimi' || provider === 'deepseek') {
+            link.textContent = `Open ${provider.toUpperCase()} to sync session ↗`
+            const hint = document.createElement('div')
+            hint.className = 'error-hint'
+            hint.style.cssText = 'font-size: 11px; color: var(--text-dim); margin-top: 6px; line-height: 1.4;'
+            hint.textContent = 'A one-time visit syncs your session into storage. Once synced, you can close the tab.'
+            bodyEl.appendChild(link)
+            bodyEl.appendChild(hint)
+          } else {
+            link.textContent = `Sign in to ${provider.toUpperCase()} ↗`
+            bodyEl.appendChild(link)
+          }
         } else if (msg.code === 'CLOUDFLARE_CHALLENGE') {
           const link = document.createElement('a')
           link.className = 'error-action-link'
@@ -413,6 +442,52 @@ btnDebugClear.addEventListener('click', () => {
   reRenderLogs()
 })
 
+function getDebugExportPayload() {
+  return {
+    exportDate: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    totalEvents: debugLogs.length,
+    events: debugLogs,
+  }
+}
+
+function flashCopySuccess(btn, text) {
+  const original = btn.textContent
+  btn.textContent = text
+  btn.classList.add('btn-copied')
+  setTimeout(() => {
+    btn.textContent = original
+    btn.classList.remove('btn-copied')
+  }, 2000)
+}
+
+// Copy JSON
+if (btnDebugCopy) {
+  btnDebugCopy.addEventListener('click', async () => {
+    if (debugLogs.length === 0) {
+      alert('No debug logs recorded to copy.')
+      return
+    }
+
+    const jsonStr = JSON.stringify(getDebugExportPayload(), null, 2)
+    try {
+      await navigator.clipboard.writeText(jsonStr)
+      flashCopySuccess(btnDebugCopy, '✓ Copied!')
+    } catch {
+      // Fallback if clipboard API restricted in some extension contexts
+      const textarea = document.createElement('textarea')
+      textarea.value = jsonStr
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      flashCopySuccess(btnDebugCopy, '✓ Copied!')
+    }
+  })
+}
+
 // Download JSON
 btnDebugDownload.addEventListener('click', () => {
   if (debugLogs.length === 0) {
@@ -420,12 +495,7 @@ btnDebugDownload.addEventListener('click', () => {
     return
   }
 
-  const exportPayload = {
-    exportDate: new Date().toISOString(),
-    userAgent: navigator.userAgent,
-    totalEvents: debugLogs.length,
-    events: debugLogs,
-  }
+  const exportPayload = getDebugExportPayload()
 
   const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
     type: 'application/json;charset=utf-8',

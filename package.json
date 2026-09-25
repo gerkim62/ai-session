@@ -1,7 +1,7 @@
 {
   "name": "ai-session-free",
   "version": "0.1.0",
-  "description": "Headless web session AI client for ChatGPT, Claude, and Gemini — no API keys required",
+  "description": "Headless web session AI client for ChatGPT, Claude, Gemini, Kimi, Copilot, and DeepSeek — no API keys required",
   "type": "module",
   "main": "./src/index.js",
   "types": "./index.d.ts",
@@ -14,6 +14,9 @@
     "./chatgpt": "./src/providers/chatgpt.js",
     "./claude": "./src/providers/claude.js",
     "./gemini": "./src/providers/gemini.js",
+    "./kimi": "./src/providers/kimi.js",
+    "./copilot": "./src/providers/copilot.js",
+    "./deepseek": "./src/providers/deepseek.js",
     "./rules.json": "./rules.json"
   },
   "files": [

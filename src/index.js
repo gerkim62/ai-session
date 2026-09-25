@@ -8,14 +8,20 @@
 import * as chatgpt from './providers/chatgpt.js'
 import * as claude from './providers/claude.js'
 import * as gemini from './providers/gemini.js'
+import * as kimi from './providers/kimi.js'
+import * as copilot from './providers/copilot.js'
+import * as deepseek from './providers/deepseek.js'
 
-export { chatgpt, claude, gemini }
+export { chatgpt, claude, gemini, kimi, copilot, deepseek }
 export { createHttpError } from './utils/http.js'
 
 export const providers = {
   chatgpt,
   claude,
   gemini,
+  kimi,
+  copilot,
+  deepseek,
 }
 
 /**
@@ -43,7 +49,7 @@ export function getAllProvidersMetadata() {
 
 /**
  * Get a provider module by string name.
- * @param {'chatgpt' | 'claude' | 'gemini'} name
+ * @param {'chatgpt' | 'claude' | 'gemini' | 'kimi' | 'copilot' | 'deepseek'} name
  */
 export function getProvider(name) {
   const provider = providers[name]
@@ -76,7 +82,7 @@ export function getProvider(name) {
  * Check session status across providers.
  * @param {object} [options]
  * @param {'cookie' | 'network'} [options.mode='cookie'] - 'cookie' for fast passive check, 'network' for reachability check
- * @param {Array<'chatgpt' | 'claude' | 'gemini'>} [options.providers] - List of providers to check (defaults to all)
+ * @param {Array<'chatgpt' | 'claude' | 'gemini' | 'kimi' | 'copilot' | 'deepseek'>} [options.providers] - List of providers to check (defaults to all)
  * @param {AbortSignal} [options.signal] - Abort signal to cancel network requests
  * @param {(entry: object) => void} [options.onLog] - Diagnostic log callback
  * @returns {Promise<{ available: string[], providers: Record<string, ProviderAuthResult> }>}
@@ -125,7 +131,7 @@ export async function checkSession({
 
 /**
  * Unified prompt dispatcher.
- * @param {'chatgpt' | 'claude' | 'gemini'} providerName
+ * @param {'chatgpt' | 'claude' | 'gemini' | 'kimi' | 'copilot' | 'deepseek'} providerName
  * @param {string} prompt
  * @param {object} [options]
  * @param {(chunk: string) => void} [options.onChunk]
@@ -133,10 +139,10 @@ export async function checkSession({
  * @param {(entry: object) => void} [options.onLog]
  * @returns {Promise<string>}
  */
-export async function sendPrompt(providerName, prompt, { onChunk, signal, onLog } = {}) {
+export async function sendPrompt(providerName, prompt, { onChunk, signal, onLog, ...rest } = {}) {
   const provider = getProvider(providerName)
   try {
-    return await provider.sendPrompt(prompt, { onChunk, signal, onLog })
+    return await provider.sendPrompt(prompt, { onChunk, signal, onLog, ...rest })
   } catch (err) {
     if (provider.metadata) {
       if (err.code === 'AUTH_REQUIRED' && !err.actionUrl) {

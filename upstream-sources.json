@@ -28,6 +28,33 @@
       "upstream_blob_sha": "240ab6278efdfb1a55936ecd829c0c107313a962",
       "extracted_date": "2026-09-21",
       "notes": "Bard/Gemini cookie auth + SNlM0e token + StreamGenerate endpoint. Also references HanaokaYuzu/Gemini-API (Python, commit 8c5b1dc)."
+    },
+    {
+      "local_path": "src/providers/kimi.js",
+      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
+      "upstream_path": "src/services/apis/moonshot-web.mjs",
+      "upstream_commit": "6554b8e",
+      "upstream_blob_sha": "2f2bfdd6dc090976194ab77e4c224e054132bd09",
+      "extracted_date": "2026-09-24",
+      "notes": "Kimi localStorage refresh_token flow, /api/auth/token/refresh, and SSE completion stream."
+    },
+    {
+      "local_path": "src/providers/copilot.js",
+      "upstream_repo": "ChatGPTBox-dev/chatGPTBox",
+      "upstream_path": "src/services/clients/bing/index.mjs",
+      "upstream_commit": "6554b8e",
+      "upstream_blob_sha": "c7ca4f8c658a17dfcc9344365184d6488c497041",
+      "extracted_date": "2026-09-24",
+      "notes": "Bing _U cookie auth, /turing/conversation/create, and Sydney SignalR WebSocket streaming."
+    },
+    {
+      "local_path": "src/providers/deepseek.js",
+      "upstream_repo": "Fly143/deepseek-free-api",
+      "upstream_path": "pow_native.py",
+      "upstream_commit": "48be2bf",
+      "upstream_blob_sha": "35062141abbd7fa1419352f9c525b530bb986d53",
+      "extracted_date": "2026-09-24",
+      "notes": "DeepSeek localStorage userToken, DeepSeekHashV1 sha3_256 PoW challenge solver, and SSE completion stream."
     }
   ]
 }

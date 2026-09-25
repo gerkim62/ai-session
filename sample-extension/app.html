@@ -32,6 +32,21 @@
         <span class="dot"></span>
         Gemini
       </label>
+      <label class="provider-toggle" data-provider="kimi">
+        <input type="checkbox" id="toggle-kimi" checked>
+        <span class="dot"></span>
+        Kimi
+      </label>
+      <label class="provider-toggle" data-provider="copilot">
+        <input type="checkbox" id="toggle-copilot" checked>
+        <span class="dot"></span>
+        Copilot
+      </label>
+      <label class="provider-toggle" data-provider="deepseek">
+        <input type="checkbox" id="toggle-deepseek" checked>
+        <span class="dot"></span>
+        DeepSeek
+      </label>
     </div>
     <div class="prompt-row">
       <textarea id="prompt-input" placeholder="Type your prompt here..." rows="2"></textarea>
@@ -64,6 +79,30 @@
       </div>
       <div class="col-body empty" id="body-gemini">Waiting for prompt...</div>
     </div>
+    <div class="response-col" id="col-kimi">
+      <div class="col-header" data-provider="kimi">
+        <span class="provider-dot"></span>
+        Kimi
+        <span class="col-status" id="status-kimi">idle</span>
+      </div>
+      <div class="col-body empty" id="body-kimi">Waiting for prompt...</div>
+    </div>
+    <div class="response-col" id="col-copilot">
+      <div class="col-header" data-provider="copilot">
+        <span class="provider-dot"></span>
+        Copilot
+        <span class="col-status" id="status-copilot">idle</span>
+      </div>
+      <div class="col-body empty" id="body-copilot">Waiting for prompt...</div>
+    </div>
+    <div class="response-col" id="col-deepseek">
+      <div class="col-header" data-provider="deepseek">
+        <span class="provider-dot"></span>
+        DeepSeek
+        <span class="col-status" id="status-deepseek">idle</span>
+      </div>
+      <div class="col-body empty" id="body-deepseek">Waiting for prompt...</div>
+    </div>
   </div>
 
   <!-- Floating Debug Action Button (FAB) -->
@@ -88,6 +127,7 @@
       </div>
       <div class="debug-actions">
         <button id="btn-debug-clear" class="btn-action" title="Clear all in-memory logs">Clear</button>
+        <button id="btn-debug-copy" class="btn-action btn-action-copy" title="Copy full debug logs as JSON to clipboard">📋 Copy JSON</button>
         <button id="btn-debug-download" class="btn-action btn-action-primary" title="Export logs as JSON">Download JSON</button>
         <button id="btn-debug-close" class="btn-close-drawer" title="Close drawer">✕</button>
       </div>
@@ -99,6 +139,9 @@
         <button class="filter-pill" data-filter="chatgpt">ChatGPT</button>
         <button class="filter-pill" data-filter="claude">Claude</button>
         <button class="filter-pill" data-filter="gemini">Gemini</button>
+        <button class="filter-pill" data-filter="kimi">Kimi</button>
+        <button class="filter-pill" data-filter="copilot">Copilot</button>
+        <button class="filter-pill" data-filter="deepseek">DeepSeek</button>
         <button class="filter-pill" data-filter="error">Errors</button>
       </div>
       <div id="debug-stats" class="debug-stat">0 events</div>
