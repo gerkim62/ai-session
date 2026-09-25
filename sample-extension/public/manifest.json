@@ -31,30 +31,15 @@
   "action": {
     "default_title": "AI Session Free Sample"
   },
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "ruleset",
-        "enabled": true,
-        "path": "rules.json"
-      }
-    ]
-  },
   "content_scripts": [
     {
       "matches": [
         "https://*.kimi.com/*",
         "https://*.kimi.moonshot.cn/*",
-        "https://*.kimi.ai/*"
-      ],
-      "js": ["content-scripts/kimi-bridge.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
+        "https://*.kimi.ai/*",
         "https://chat.deepseek.com/*"
       ],
-      "js": ["content-scripts/deepseek-bridge.js"],
+      "js": ["bridge.js"],
       "run_at": "document_idle"
     }
   ]

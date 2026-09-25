@@ -19,6 +19,7 @@ import { fetchSSE } from '../utils/sse-parser.js'
 import { createLogger } from '../utils/log.js'
 import { assertOk, createHttpError } from '../utils/http.js'
 import { solveDeepSeekPoW } from '../utils/deepseek-pow.js'
+import { getJwtExp } from '../utils/crypto.js'
 
 export const metadata = {
   id: 'deepseek',
@@ -45,27 +46,6 @@ async function getStoredToken() {
   return ''
 }
 
-/**
- * Obtain a valid DeepSeek user token.
-/**
- * Decode JWT expiration timestamp without external dependencies.
- * @param {string} jwt
- * @returns {number | null} Expiration timestamp in seconds, or null if not a parseable JWT
- */
-function getJwtExp(jwt) {
-  if (typeof jwt !== 'string') return null
-  const parts = jwt.split('.')
-  if (parts.length < 2) return null
-  try {
-    const raw = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = raw.padEnd(raw.length + ((4 - (raw.length % 4)) % 4), '=')
-    const decoded = typeof atob === 'function' ? atob(padded) : Buffer.from(padded, 'base64').toString('binary')
-    const payload = JSON.parse(decoded)
-    return typeof payload.exp === 'number' ? payload.exp : null
-  } catch {
-    return null
-  }
-}
 
 /**
  * Obtain a valid DeepSeek user token.

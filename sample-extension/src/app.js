@@ -5,6 +5,8 @@
  * and full-stack Run I/O Debug Console with on/off, clear, filter, and JSON download.
  */
 
+import { getAllProvidersMetadata, getProviderMetadata } from 'ai-session-free'
+
 // --- State ---
 let port = null
 let isLoading = false
@@ -16,40 +18,59 @@ let isDebugMode = false
 let debugLogs = []
 let activeFilter = 'all'
 
-// --- DOM refs ---
+// --- DOM containers ---
 const promptInput = document.getElementById('prompt-input')
 const btnSend = document.getElementById('btn-send')
-const toggles = {
-  chatgpt: document.getElementById('toggle-chatgpt'),
-  claude: document.getElementById('toggle-claude'),
-  gemini: document.getElementById('toggle-gemini'),
-  kimi: document.getElementById('toggle-kimi'),
-  copilot: document.getElementById('toggle-copilot'),
-  deepseek: document.getElementById('toggle-deepseek'),
-}
-const cols = {
-  chatgpt: document.getElementById('col-chatgpt'),
-  claude: document.getElementById('col-claude'),
-  gemini: document.getElementById('col-gemini'),
-  kimi: document.getElementById('col-kimi'),
-  copilot: document.getElementById('col-copilot'),
-  deepseek: document.getElementById('col-deepseek'),
-}
-const bodies = {
-  chatgpt: document.getElementById('body-chatgpt'),
-  claude: document.getElementById('body-claude'),
-  gemini: document.getElementById('body-gemini'),
-  kimi: document.getElementById('body-kimi'),
-  copilot: document.getElementById('body-copilot'),
-  deepseek: document.getElementById('body-deepseek'),
-}
-const statuses = {
-  chatgpt: document.getElementById('status-chatgpt'),
-  claude: document.getElementById('status-claude'),
-  gemini: document.getElementById('status-gemini'),
-  kimi: document.getElementById('status-kimi'),
-  copilot: document.getElementById('status-copilot'),
-  deepseek: document.getElementById('status-deepseek'),
+const providerTogglesContainer = document.getElementById('provider-toggles')
+const responsesContainer = document.getElementById('responses')
+const debugFiltersContainer = document.getElementById('debug-filters')
+const errorFilterPill = debugFiltersContainer?.querySelector('[data-filter="error"]')
+
+// --- Dynamically generate provider UI elements from library metadata ---
+const providersMeta = getAllProvidersMetadata()
+const toggles = {}
+const cols = {}
+const bodies = {}
+const statuses = {}
+
+for (const [provider, meta] of Object.entries(providersMeta)) {
+  // 1. Toggle checkbox
+  const label = document.createElement('label')
+  label.className = 'provider-toggle'
+  label.dataset.provider = provider
+  label.innerHTML = `
+    <input type="checkbox" id="toggle-${provider}" checked>
+    <span class="dot"></span>
+    ${meta.displayName || provider}
+  `
+  providerTogglesContainer.appendChild(label)
+  toggles[provider] = label.querySelector('input')
+
+  // 2. Response column
+  const col = document.createElement('div')
+  col.className = 'response-col'
+  col.id = `col-${provider}`
+  col.innerHTML = `
+    <div class="col-header" data-provider="${provider}">
+      <span class="provider-dot"></span>
+      ${meta.displayName || provider}
+      <span class="col-status" id="status-${provider}">idle</span>
+    </div>
+    <div class="col-body empty" id="body-${provider}">Waiting for prompt...</div>
+  `
+  responsesContainer.appendChild(col)
+  cols[provider] = col
+  bodies[provider] = col.querySelector(`#body-${provider}`)
+  statuses[provider] = col.querySelector(`#status-${provider}`)
+
+  // 3. Debug filter pill
+  if (debugFiltersContainer && errorFilterPill) {
+    const pill = document.createElement('button')
+    pill.className = 'filter-pill'
+    pill.dataset.filter = provider
+    pill.textContent = meta.displayName || provider
+    debugFiltersContainer.insertBefore(pill, errorFilterPill)
+  }
 }
 
 // Session DOM refs
@@ -221,19 +242,12 @@ function connectPort() {
         msgDiv.textContent = '⚠ ' + error
         bodyEl.appendChild(msgDiv)
 
-        const defaultLoginUrls = {
-          chatgpt: 'https://chatgpt.com/auth/login',
-          claude: 'https://claude.ai/login',
-          gemini: 'https://gemini.google.com/',
-          kimi: 'https://kimi.ai/',
-          copilot: 'https://copilot.microsoft.com/',
-          deepseek: 'https://chat.deepseek.com/',
-        }
+        const loginUrl = msg.actionUrl || getProviderMetadata(provider)?.loginUrl || 'https://google.com'
 
         if (msg.code === 'AUTH_REQUIRED') {
           const link = document.createElement('a')
           link.className = 'error-action-link'
-          link.href = defaultLoginUrls[provider] || 'https://google.com'
+          link.href = loginUrl
           link.target = '_blank'
           link.rel = 'noreferrer noopener'
           if (provider === 'kimi' || provider === 'deepseek') {
@@ -251,7 +265,7 @@ function connectPort() {
         } else if (msg.code === 'CLOUDFLARE_CHALLENGE') {
           const link = document.createElement('a')
           link.className = 'error-action-link'
-          link.href = defaultLoginUrls[provider] || 'https://google.com'
+          link.href = msg.actionUrl || getProviderMetadata(provider)?.challengeUrl || loginUrl
           link.target = '_blank'
           link.rel = 'noreferrer noopener'
           link.textContent = `Open ${provider.toUpperCase()} tab to verify ↗`
@@ -259,7 +273,7 @@ function connectPort() {
         } else if (msg.code === 'FORBIDDEN') {
           const link = document.createElement('a')
           link.className = 'error-action-link'
-          link.href = defaultLoginUrls[provider] || 'https://google.com'
+          link.href = loginUrl
           link.target = '_blank'
           link.rel = 'noreferrer noopener'
           link.textContent = `Visit ${provider.toUpperCase()} ↗`

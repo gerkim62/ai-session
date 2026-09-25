@@ -159,3 +159,30 @@ export function ensureDynamicRules(): Promise<void>;
  */
 export function disableDynamicRules(): void;
 
+/**
+ * Required standard extension permissions for ai-session-free.
+ */
+export const REQUIRED_PERMISSIONS: string[];
+
+/**
+ * Mapping of provider names to their required host permission patterns.
+ */
+export const PROVIDER_HOST_PERMISSIONS: Record<string, string[]>;
+
+/**
+ * Array of all host permissions needed for all 6 providers.
+ * Can be spread directly into manifest.json host_permissions.
+ */
+export const HOST_PERMISSIONS: string[];
+
+/**
+ * Validates the running extension's manifest at runtime and logs actionable warnings
+ * if host permissions or CSP are missing.
+ */
+export function validateManifest(targetProvider?: string): {
+  valid: boolean;
+  missingHostPermissions: string[];
+  missingCsp: boolean;
+};
+
+

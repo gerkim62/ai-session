@@ -16,94 +16,16 @@
   </div>
 
   <div class="input-area">
-    <div class="provider-toggles">
-      <label class="provider-toggle" data-provider="chatgpt">
-        <input type="checkbox" id="toggle-chatgpt" checked>
-        <span class="dot"></span>
-        ChatGPT
-      </label>
-      <label class="provider-toggle" data-provider="claude">
-        <input type="checkbox" id="toggle-claude" checked>
-        <span class="dot"></span>
-        Claude
-      </label>
-      <label class="provider-toggle" data-provider="gemini">
-        <input type="checkbox" id="toggle-gemini" checked>
-        <span class="dot"></span>
-        Gemini
-      </label>
-      <label class="provider-toggle" data-provider="kimi">
-        <input type="checkbox" id="toggle-kimi" checked>
-        <span class="dot"></span>
-        Kimi
-      </label>
-      <label class="provider-toggle" data-provider="copilot">
-        <input type="checkbox" id="toggle-copilot" checked>
-        <span class="dot"></span>
-        Copilot
-      </label>
-      <label class="provider-toggle" data-provider="deepseek">
-        <input type="checkbox" id="toggle-deepseek" checked>
-        <span class="dot"></span>
-        DeepSeek
-      </label>
-    </div>
+    <!-- Provider toggles rendered dynamically from library metadata -->
+    <div class="provider-toggles" id="provider-toggles"></div>
     <div class="prompt-row">
       <textarea id="prompt-input" placeholder="Type your prompt here..." rows="2"></textarea>
       <button class="btn btn-send" id="btn-send">Send</button>
     </div>
   </div>
 
-  <div class="responses" id="responses">
-    <div class="response-col" id="col-chatgpt">
-      <div class="col-header" data-provider="chatgpt">
-        <span class="provider-dot"></span>
-        ChatGPT
-        <span class="col-status" id="status-chatgpt">idle</span>
-      </div>
-      <div class="col-body empty" id="body-chatgpt">Waiting for prompt...</div>
-    </div>
-    <div class="response-col" id="col-claude">
-      <div class="col-header" data-provider="claude">
-        <span class="provider-dot"></span>
-        Claude
-        <span class="col-status" id="status-claude">idle</span>
-      </div>
-      <div class="col-body empty" id="body-claude">Waiting for prompt...</div>
-    </div>
-    <div class="response-col" id="col-gemini">
-      <div class="col-header" data-provider="gemini">
-        <span class="provider-dot"></span>
-        Gemini
-        <span class="col-status" id="status-gemini">idle</span>
-      </div>
-      <div class="col-body empty" id="body-gemini">Waiting for prompt...</div>
-    </div>
-    <div class="response-col" id="col-kimi">
-      <div class="col-header" data-provider="kimi">
-        <span class="provider-dot"></span>
-        Kimi
-        <span class="col-status" id="status-kimi">idle</span>
-      </div>
-      <div class="col-body empty" id="body-kimi">Waiting for prompt...</div>
-    </div>
-    <div class="response-col" id="col-copilot">
-      <div class="col-header" data-provider="copilot">
-        <span class="provider-dot"></span>
-        Copilot
-        <span class="col-status" id="status-copilot">idle</span>
-      </div>
-      <div class="col-body empty" id="body-copilot">Waiting for prompt...</div>
-    </div>
-    <div class="response-col" id="col-deepseek">
-      <div class="col-header" data-provider="deepseek">
-        <span class="provider-dot"></span>
-        DeepSeek
-        <span class="col-status" id="status-deepseek">idle</span>
-      </div>
-      <div class="col-body empty" id="body-deepseek">Waiting for prompt...</div>
-    </div>
-  </div>
+  <!-- Provider response columns rendered dynamically from library metadata -->
+  <div class="responses" id="responses"></div>
 
   <!-- Floating Debug Action Button (FAB) -->
   <button id="btn-debug-fab" class="debug-fab" title="Toggle Run I/O Debug Console">
@@ -134,14 +56,9 @@
     </div>
 
     <div class="debug-toolbar">
-      <div class="debug-filters">
+      <div class="debug-filters" id="debug-filters">
         <button class="filter-pill active" data-filter="all">All</button>
-        <button class="filter-pill" data-filter="chatgpt">ChatGPT</button>
-        <button class="filter-pill" data-filter="claude">Claude</button>
-        <button class="filter-pill" data-filter="gemini">Gemini</button>
-        <button class="filter-pill" data-filter="kimi">Kimi</button>
-        <button class="filter-pill" data-filter="copilot">Copilot</button>
-        <button class="filter-pill" data-filter="deepseek">DeepSeek</button>
+        <!-- Provider filter pills rendered dynamically -->
         <button class="filter-pill" data-filter="error">Errors</button>
       </div>
       <div id="debug-stats" class="debug-stat">0 events</div>
