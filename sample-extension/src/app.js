@@ -70,6 +70,71 @@ const debugStats = document.getElementById('debug-stats')
 const debugLogList = document.getElementById('debug-log-list')
 const filterPills = document.querySelectorAll('.filter-pill')
 
+// --- UI State Persistence (localStorage) ---
+const STORAGE_KEY = 'ai_session_ui_state'
+
+function loadUIState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (err) {
+    console.warn('Failed to load UI state from localStorage:', err)
+    return null
+  }
+}
+
+function saveUIState() {
+  try {
+    const togglesState = {}
+    for (const [provider, toggle] of Object.entries(toggles)) {
+      togglesState[provider] = toggle.checked
+    }
+    const state = {
+      toggles: togglesState,
+      isDebugMode,
+      activeFilter,
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch (err) {
+    console.warn('Failed to save UI state to localStorage:', err)
+  }
+}
+
+function restoreUIState() {
+  const savedState = loadUIState()
+  if (!savedState) return
+
+  // Restore provider checkboxes
+  if (savedState.toggles && typeof savedState.toggles === 'object') {
+    for (const [provider, checked] of Object.entries(savedState.toggles)) {
+      if (toggles[provider] && typeof checked === 'boolean') {
+        toggles[provider].checked = checked
+      }
+    }
+  }
+
+  // Restore Debug Mode switch
+  if (typeof savedState.isDebugMode === 'boolean') {
+    isDebugMode = savedState.isDebugMode
+    if (debugToggle) debugToggle.checked = isDebugMode
+    if (debugToggleStatus) debugToggleStatus.textContent = isDebugMode ? 'Debug: ON' : 'Debug: OFF'
+    if (btnDebugFab) btnDebugFab.classList.toggle('active', isDebugMode)
+  }
+
+  // Restore active log filter pill
+  if (typeof savedState.activeFilter === 'string') {
+    const matchingPill = Array.from(filterPills).find(
+      (p) => p.getAttribute('data-filter') === savedState.activeFilter
+    )
+    if (matchingPill) {
+      activeFilter = savedState.activeFilter
+      for (const pill of filterPills) {
+        pill.classList.toggle('active', pill === matchingPill)
+      }
+    }
+  }
+}
+
 // --- Column visibility ---
 function updateColumnVisibility() {
   for (const [provider, toggle] of Object.entries(toggles)) {
@@ -78,8 +143,14 @@ function updateColumnVisibility() {
 }
 
 for (const toggle of Object.values(toggles)) {
-  toggle.addEventListener('change', updateColumnVisibility)
+  toggle.addEventListener('change', () => {
+    updateColumnVisibility()
+    saveUIState()
+  })
 }
+
+// Restore saved settings on initial load
+restoreUIState()
 updateColumnVisibility()
 
 // --- Status helpers ---
@@ -432,6 +503,7 @@ debugToggle.addEventListener('change', () => {
   isDebugMode = debugToggle.checked
   debugToggleStatus.textContent = isDebugMode ? 'Debug: ON' : 'Debug: OFF'
   btnDebugFab.classList.toggle('active', isDebugMode)
+  saveUIState()
 })
 
 // Clear logs
@@ -517,6 +589,7 @@ for (const pill of filterPills) {
     for (const p of filterPills) p.classList.remove('active')
     pill.classList.add('active')
     activeFilter = pill.getAttribute('data-filter')
+    saveUIState()
     reRenderLogs()
   })
 }
