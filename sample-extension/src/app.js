@@ -5,7 +5,7 @@
  * and full-stack Run I/O Debug Console with on/off, clear, filter, and JSON download.
  */
 
-import { getAllProvidersMetadata, getProviderMetadata } from 'ai-session-free'
+import { getAllProvidersMetadata, getProviderMetadata, maskSensitiveData } from 'ai-session-free'
 
 // --- State ---
 let port = null
@@ -546,11 +546,13 @@ btnDebugClear.addEventListener('click', () => {
 })
 
 function getDebugExportPayload() {
+  // Apply secondary masking as a safety layer before export / copy
+  const safeEvents = debugLogs.map((entry) => maskSensitiveData(entry))
   return {
     exportDate: new Date().toISOString(),
     userAgent: navigator.userAgent,
-    totalEvents: debugLogs.length,
-    events: debugLogs,
+    totalEvents: safeEvents.length,
+    events: safeEvents,
   }
 }
 

@@ -11,11 +11,20 @@ export interface LogEntry {
 }
 
 /**
+ * Options for masking sensitive data in logs.
+ */
+export interface MaskOptions {
+  maskSensitive?: boolean;
+  textMaxLength?: number;
+}
+
+/**
  * Options passed to `sendPrompt`.
  */
 export interface PromptOptions {
   onChunk?: (chunk: string) => void;
   signal?: AbortSignal;
+  maskSensitive?: boolean;
   onLog?: (entry: LogEntry) => void;
 }
 
@@ -28,6 +37,7 @@ export interface CheckSessionOptions {
   mode?: 'cookie' | 'network';
   providers?: Array<ProviderName | string>;
   signal?: AbortSignal;
+  maskSensitive?: boolean;
   onLog?: (entry: LogEntry) => void;
 }
 
@@ -184,5 +194,45 @@ export function validateManifest(targetProvider?: string): {
   missingHostPermissions: string[];
   missingCsp: boolean;
 };
+
+/**
+ * Mask a secret string (token, password, key) while preserving debug utility.
+ */
+export function maskSecret(value: string): string;
+
+/**
+ * Mask a semicolon-separated cookie header string, preserving cookie names.
+ */
+export function maskCookieString(cookieStr: string): string;
+
+/**
+ * Truncate long prompt or AI response text to a safe preview with length metadata.
+ */
+export function maskTextPreview(text: string, maxLength?: number): string;
+
+/**
+ * Scan arbitrary strings and sanitize embedded Bearer tokens or sensitive cookie assignments.
+ */
+export function maskStringSecrets(str: string): string;
+
+/**
+ * Recursively mask sensitive credentials and truncate prompts/completions in data payloads.
+ */
+export function maskSensitiveData<T = any>(data: T, options?: MaskOptions): T;
+
+/**
+ * Create a provider-scoped log function with automatic sensitive data masking.
+ */
+export function createLogger(
+  provider: string,
+  defaultOptions?: MaskOptions
+): (
+  onLog: ((entry: LogEntry) => void) | undefined,
+  level: string,
+  category: string,
+  message: string,
+  data?: any,
+  logOptions?: MaskOptions
+) => void;
 
 

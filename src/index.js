@@ -21,6 +21,14 @@ import {
 
 export { chatgpt, claude, gemini, kimi, copilot, deepseek }
 export { createHttpError } from './utils/http.js'
+export {
+  createLogger,
+  maskSensitiveData,
+  maskSecret,
+  maskCookieString,
+  maskTextPreview,
+  maskStringSecrets,
+} from './utils/log.js'
 export { NET_RULES, setupDynamicRules, ensureDynamicRules, disableDynamicRules }
 export {
   REQUIRED_PERMISSIONS,
@@ -98,6 +106,7 @@ export function getProvider(name) {
  * @param {'cookie' | 'network'} [options.mode='cookie'] - 'cookie' for fast passive check, 'network' for reachability check
  * @param {Array<'chatgpt' | 'claude' | 'gemini' | 'kimi' | 'copilot' | 'deepseek'>} [options.providers] - List of providers to check (defaults to all)
  * @param {AbortSignal} [options.signal] - Abort signal to cancel network requests
+ * @param {boolean} [options.maskSensitive=true] - Whether to mask credentials and sensitive data in logs
  * @param {(entry: object) => void} [options.onLog] - Diagnostic log callback
  * @returns {Promise<{ available: string[], providers: Record<string, ProviderAuthResult> }>}
  */
@@ -105,16 +114,23 @@ export async function checkSession({
   mode = 'cookie',
   providers: targetProviders = Object.keys(providers),
   signal,
+  maskSensitive = true,
   onLog,
 } = {}) {
-  await ensureDynamicRules(onLog)
+  let activeOnLog = onLog
+  if (typeof onLog === 'function') {
+    activeOnLog = (...args) => onLog(...args)
+    activeOnLog.maskSensitive = maskSensitive
+  }
+
+  await ensureDynamicRules(activeOnLog)
   validateManifest()
   const entries = await Promise.all(
     targetProviders.map(async (name) => {
       const provider = getProvider(name)
       const metadata = provider.metadata
       try {
-        const result = await provider.checkAuth({ mode, signal, onLog })
+        const result = await provider.checkAuth({ mode, signal, onLog: activeOnLog })
         return [
           name,
           {
@@ -152,15 +168,26 @@ export async function checkSession({
  * @param {object} [options]
  * @param {(chunk: string) => void} [options.onChunk]
  * @param {AbortSignal} [options.signal]
+ * @param {boolean} [options.maskSensitive=true] - Whether to mask credentials and sensitive data in logs
  * @param {(entry: object) => void} [options.onLog]
  * @returns {Promise<string>}
  */
-export async function sendPrompt(providerName, prompt, { onChunk, signal, onLog, ...rest } = {}) {
-  await ensureDynamicRules(onLog)
+export async function sendPrompt(
+  providerName,
+  prompt,
+  { onChunk, signal, maskSensitive = true, onLog, ...rest } = {},
+) {
+  let activeOnLog = onLog
+  if (typeof onLog === 'function') {
+    activeOnLog = (...args) => onLog(...args)
+    activeOnLog.maskSensitive = maskSensitive
+  }
+
+  await ensureDynamicRules(activeOnLog)
   validateManifest(providerName)
   const provider = getProvider(providerName)
   try {
-    return await provider.sendPrompt(prompt, { onChunk, signal, onLog, ...rest })
+    return await provider.sendPrompt(prompt, { onChunk, signal, onLog: activeOnLog, ...rest })
   } catch (err) {
     if (provider.metadata) {
       if (err.code === 'AUTH_REQUIRED' && !err.actionUrl) {

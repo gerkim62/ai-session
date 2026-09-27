@@ -6,6 +6,10 @@
  * coexistence with any dynamic or static rules the host extension already defines.
  */
 
+import { createLogger } from './log.js'
+
+const log = createLogger('system')
+
 export const RULE_ID_OFFSET = 91000
 
 export const NET_RULES = [
@@ -150,33 +154,15 @@ export async function setupDynamicRules(onLog) {
       addRules: NET_RULES,
     })
     rulesInstalled = true
-    if (typeof onLog === 'function') {
-      try {
-        onLog({
-          timestamp: new Date().toISOString(),
-          provider: 'system',
-          level: 'debug',
-          category: 'DYNAMIC_RULES',
-          message: 'Configured DeclarativeNetRequest dynamic rules',
-          data: { ruleCount: NET_RULES.length },
-        })
-      } catch {}
-    }
+    log(onLog, 'debug', 'DYNAMIC_RULES', 'Configured DeclarativeNetRequest dynamic rules', {
+      ruleCount: NET_RULES.length,
+    })
     return true
   } catch (err) {
     console.warn('[ai-session-free] Failed to configure dynamic rules:', err)
-    if (typeof onLog === 'function') {
-      try {
-        onLog({
-          timestamp: new Date().toISOString(),
-          provider: 'system',
-          level: 'warn',
-          category: 'DYNAMIC_RULES_ERROR',
-          message: `Failed to configure dynamic rules: ${err.message || String(err)}`,
-          data: { error: err.message || String(err) },
-        })
-      } catch {}
-    }
+    log(onLog, 'warn', 'DYNAMIC_RULES_ERROR', `Failed to configure dynamic rules: ${err.message || String(err)}`, {
+      error: err.message || String(err),
+    })
     return false
   }
 }

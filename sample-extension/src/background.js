@@ -4,7 +4,7 @@
  * Demonstrates consuming the `ai-session-free` library package.
  */
 
-import { sendPrompt, checkSession } from 'ai-session-free'
+import { sendPrompt, checkSession, maskSensitiveData, maskStringSecrets } from 'ai-session-free'
 
 // Track active AbortControllers per port
 const activeRequests = new Map()
@@ -14,10 +14,11 @@ chrome.runtime.onConnect.addListener((port) => {
 
   port.onMessage.addListener(async (msg) => {
     if (msg.type === 'CHECK_SESSION') {
-      const { options = {}, requestId, debug } = msg
+      const { options = {}, requestId, debug, maskSensitive = true } = msg
       try {
         const result = await checkSession({
           ...options,
+          maskSensitive,
           onLog: debug
             ? (entry) => {
                 try {
@@ -50,13 +51,14 @@ chrome.runtime.onConnect.addListener((port) => {
 
     if (msg.type !== 'SEND_PROMPT') return
 
-    const { provider: providerName, prompt, requestId, debug } = msg
+    const { provider: providerName, prompt, requestId, debug, maskSensitive = true } = msg
     const controller = new AbortController()
     activeRequests.set(requestId, controller)
 
     try {
       await sendPrompt(providerName, prompt, {
         signal: controller.signal,
+        maskSensitive,
         onLog: debug
           ? (entry) => {
               try {
@@ -100,22 +102,23 @@ chrome.runtime.onConnect.addListener((port) => {
       } else {
         if (debug) {
           try {
+            const rawEntry = {
+              timestamp: new Date().toISOString(),
+              provider: providerName,
+              level: 'error',
+              category: 'PROMPT_ERROR',
+              message: err.message || String(err),
+              data: {
+                code: err.code || null,
+                status: err.status || null,
+                actionUrl: err.actionUrl || null,
+              },
+            }
             port.postMessage({
               type: 'DEBUG_LOG',
               requestId,
               provider: providerName,
-              entry: {
-                timestamp: new Date().toISOString(),
-                provider: providerName,
-                level: 'error',
-                category: 'PROMPT_ERROR',
-                message: err.message || String(err),
-                data: {
-                  code: err.code || null,
-                  status: err.status || null,
-                  actionUrl: err.actionUrl || null,
-                },
-              },
+              entry: maskSensitive ? maskSensitiveData(rawEntry) : rawEntry,
             })
           } catch {
             // Port disconnected
