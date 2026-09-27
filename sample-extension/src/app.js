@@ -33,18 +33,23 @@ const cols = {}
 const bodies = {}
 const statuses = {}
 
+let isFirst = true
 for (const [provider, meta] of Object.entries(providersMeta)) {
-  // 1. Toggle checkbox
+  // 1. Radio option (Single model selection with circular radio indicator)
   const label = document.createElement('label')
-  label.className = 'provider-toggle'
+  label.className = `model-radio-option ${isFirst ? 'selected' : ''}`
   label.dataset.provider = provider
+  label.title = `Select ${meta.displayName || provider}`
   label.innerHTML = `
-    <input type="checkbox" id="toggle-${provider}" checked>
-    <span class="dot"></span>
-    ${meta.displayName || provider}
+    <input type="radio" name="selected-model" id="toggle-${provider}" value="${provider}" ${isFirst ? 'checked' : ''}>
+    <span class="radio-indicator">
+      <span class="radio-dot"></span>
+    </span>
+    <span class="model-name">${meta.displayName || provider}</span>
   `
   providerTogglesContainer.appendChild(label)
   toggles[provider] = label.querySelector('input')
+  isFirst = false
 
   // 2. Response column
   const col = document.createElement('div')
@@ -106,11 +111,16 @@ function loadUIState() {
 
 function saveUIState() {
   try {
+    let selectedModel = null
     const togglesState = {}
     for (const [provider, toggle] of Object.entries(toggles)) {
       togglesState[provider] = toggle.checked
+      if (toggle.checked) {
+        selectedModel = provider
+      }
     }
     const state = {
+      selectedModel,
       toggles: togglesState,
       isDebugMode,
       activeFilter,
@@ -125,13 +135,16 @@ function restoreUIState() {
   const savedState = loadUIState()
   if (!savedState) return
 
-  // Restore provider checkboxes
-  if (savedState.toggles && typeof savedState.toggles === 'object') {
-    for (const [provider, checked] of Object.entries(savedState.toggles)) {
-      if (toggles[provider] && typeof checked === 'boolean') {
-        toggles[provider].checked = checked
-      }
+  // Restore selected radio model
+  let targetModel = savedState.selectedModel
+  if (!targetModel && savedState.toggles && typeof savedState.toggles === 'object') {
+    targetModel = Object.keys(savedState.toggles).find((p) => savedState.toggles[p])
+  }
+  if (targetModel && toggles[targetModel]) {
+    for (const toggle of Object.values(toggles)) {
+      toggle.checked = false
     }
+    toggles[targetModel].checked = true
   }
 
   // Restore Debug Mode switch
@@ -156,10 +169,14 @@ function restoreUIState() {
   }
 }
 
-// --- Column visibility ---
+// --- Column visibility & active selection indicator ---
 function updateColumnVisibility() {
   for (const [provider, toggle] of Object.entries(toggles)) {
     cols[provider].classList.toggle('hidden', !toggle.checked)
+    const label = toggle.closest('.model-radio-option')
+    if (label) {
+      label.classList.toggle('selected', toggle.checked)
+    }
   }
 }
 

@@ -17,6 +17,7 @@ import { fetchSSE } from '../utils/sse-parser.js'
 import { createLogger } from '../utils/log.js'
 import { generateUUID } from '../utils/crypto.js'
 import { buildCookieString, assertOk, createHttpError } from '../utils/http.js'
+import { ensureDynamicRules } from '../utils/rules.js'
 
 export const metadata = {
   id: 'claude',
@@ -47,6 +48,8 @@ function makeHeaders(cookieStr) {
     'Content-Type': 'application/json',
     Accept: 'text/event-stream,text/event-stream',
     Cookie: cookieStr,
+    Origin: 'https://claude.ai',
+    Referer: 'https://claude.ai/',
   }
 }
 
@@ -129,6 +132,7 @@ async function deleteConversation(orgId, convoId, cookieStr, onLog) {
  * @returns {Promise<string>} final answer text
  */
 export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
+  await ensureDynamicRules(onLog)
   log(onLog, 'info', 'PROMPT_START', 'Starting Claude prompt execution', { prompt })
 
   let orgId = null
@@ -220,6 +224,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
  * @returns {Promise<{ authenticated: boolean, loginUrl: string, challengeUrl?: string, reason?: string, metadata?: import('../index.js').ProviderMetadata }>}
  */
 export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
+  await ensureDynamicRules(onLog)
   try {
     const cookies = await chrome.cookies.getAll({ url: 'https://claude.ai/' })
     log(onLog, 'debug', 'COOKIE', 'checkAuth: retrieved cookies for https://claude.ai/', cookies)

@@ -15,13 +15,13 @@ export const NET_RULES = [
     action: {
       type: 'modifyHeaders',
       requestHeaders: [
-        { operation: 'set', header: 'origin', value: 'https://chatgpt.com' },
-        { operation: 'set', header: 'referer', value: 'https://chatgpt.com' },
+        { header: 'Origin', operation: 'set', value: 'https://chatgpt.com' },
+        { header: 'Referer', operation: 'set', value: 'https://chatgpt.com/' },
       ],
     },
     condition: {
       requestDomains: ['chatgpt.com'],
-      resourceTypes: ['xmlhttprequest'],
+      resourceTypes: ['xmlhttprequest', 'other'],
     },
   },
   {
@@ -30,13 +30,13 @@ export const NET_RULES = [
     action: {
       type: 'modifyHeaders',
       requestHeaders: [
-        { operation: 'set', header: 'origin', value: 'https://claude.ai' },
-        { operation: 'set', header: 'referer', value: 'https://claude.ai' },
+        { header: 'Origin', operation: 'set', value: 'https://claude.ai' },
+        { header: 'Referer', operation: 'set', value: 'https://claude.ai/' },
       ],
     },
     condition: {
       requestDomains: ['claude.ai'],
-      resourceTypes: ['xmlhttprequest'],
+      resourceTypes: ['xmlhttprequest', 'other'],
     },
   },
   {
@@ -45,13 +45,13 @@ export const NET_RULES = [
     action: {
       type: 'modifyHeaders',
       requestHeaders: [
-        { operation: 'set', header: 'origin', value: 'https://gemini.google.com' },
-        { operation: 'set', header: 'referer', value: 'https://gemini.google.com' },
+        { header: 'Origin', operation: 'set', value: 'https://gemini.google.com' },
+        { header: 'Referer', operation: 'set', value: 'https://gemini.google.com/' },
       ],
     },
     condition: {
       requestDomains: ['gemini.google.com'],
-      resourceTypes: ['xmlhttprequest'],
+      resourceTypes: ['xmlhttprequest', 'other'],
     },
   },
   {
@@ -60,13 +60,13 @@ export const NET_RULES = [
     action: {
       type: 'modifyHeaders',
       requestHeaders: [
-        { operation: 'set', header: 'origin', value: 'https://kimi.ai' },
-        { operation: 'set', header: 'referer', value: 'https://kimi.ai/' },
+        { header: 'Origin', operation: 'set', value: 'https://kimi.ai' },
+        { header: 'Referer', operation: 'set', value: 'https://kimi.ai/' },
       ],
     },
     condition: {
       requestDomains: ['kimi.ai', 'www.kimi.ai'],
-      resourceTypes: ['xmlhttprequest'],
+      resourceTypes: ['xmlhttprequest', 'other'],
     },
   },
   {
@@ -75,13 +75,13 @@ export const NET_RULES = [
     action: {
       type: 'modifyHeaders',
       requestHeaders: [
-        { operation: 'set', header: 'origin', value: 'https://www.bing.com' },
-        { operation: 'set', header: 'referer', value: 'https://www.bing.com/search?q=Bing+AI&showconv=1&FORM=hpcodx' },
+        { header: 'Origin', operation: 'set', value: 'https://www.bing.com' },
+        { header: 'Referer', operation: 'set', value: 'https://www.bing.com/search?q=Bing+AI&showconv=1&FORM=hpcodx' },
       ],
     },
     condition: {
       requestDomains: ['sydney.bing.com', 'www.bing.com', 'bing.com', 'copilot.microsoft.com'],
-      resourceTypes: ['xmlhttprequest', 'websocket'],
+      resourceTypes: ['xmlhttprequest', 'websocket', 'other'],
     },
   },
   {
@@ -90,13 +90,13 @@ export const NET_RULES = [
     action: {
       type: 'modifyHeaders',
       requestHeaders: [
-        { operation: 'set', header: 'origin', value: 'https://chat.deepseek.com' },
-        { operation: 'set', header: 'referer', value: 'https://chat.deepseek.com/' },
+        { header: 'Origin', operation: 'set', value: 'https://chat.deepseek.com' },
+        { header: 'Referer', operation: 'set', value: 'https://chat.deepseek.com/' },
       ],
     },
     condition: {
       requestDomains: ['chat.deepseek.com'],
-      resourceTypes: ['xmlhttprequest'],
+      resourceTypes: ['xmlhttprequest', 'other'],
     },
   },
   {
@@ -105,19 +105,20 @@ export const NET_RULES = [
     action: {
       type: 'modifyHeaders',
       requestHeaders: [
-        { operation: 'set', header: 'origin', value: 'https://www.kimi.com' },
-        { operation: 'set', header: 'referer', value: 'https://www.kimi.com/' },
+        { header: 'Origin', operation: 'set', value: 'https://www.kimi.com' },
+        { header: 'Referer', operation: 'set', value: 'https://www.kimi.com/' },
       ],
     },
     condition: {
       requestDomains: ['kimi.com', 'kimi.moonshot.cn', 'www.kimi.com'],
-      resourceTypes: ['xmlhttprequest'],
+      resourceTypes: ['xmlhttprequest', 'other'],
     },
   },
 ]
 
 let rulesInstalled = false
 let dynamicRulesDisabled = false
+let initPromise = null
 
 /**
  * Opt-out: disable automatic dynamic rule registration if the host extension
@@ -133,23 +134,49 @@ export function disableDynamicRules() {
  * Only adds/removes rule IDs in the dedicated 91001-91007 range, never touching
  * any custom dynamic rules the host extension created.
  *
+ * @param {(entry: object) => void} [onLog]
  * @returns {Promise<boolean>}
  */
-export async function setupDynamicRules() {
+export async function setupDynamicRules(onLog) {
   if (dynamicRulesDisabled) return false
   if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest?.updateDynamicRules) {
     return false
   }
+
+  const ruleIds = NET_RULES.map((r) => r.id)
   try {
-    const ruleIds = NET_RULES.map((r) => r.id)
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: ruleIds,
       addRules: NET_RULES,
     })
     rulesInstalled = true
+    if (typeof onLog === 'function') {
+      try {
+        onLog({
+          timestamp: new Date().toISOString(),
+          provider: 'system',
+          level: 'debug',
+          category: 'DYNAMIC_RULES',
+          message: 'Configured DeclarativeNetRequest dynamic rules',
+          data: { ruleCount: NET_RULES.length },
+        })
+      } catch {}
+    }
     return true
   } catch (err) {
     console.warn('[ai-session-free] Failed to configure dynamic rules:', err)
+    if (typeof onLog === 'function') {
+      try {
+        onLog({
+          timestamp: new Date().toISOString(),
+          provider: 'system',
+          level: 'warn',
+          category: 'DYNAMIC_RULES_ERROR',
+          message: `Failed to configure dynamic rules: ${err.message || String(err)}`,
+          data: { error: err.message || String(err) },
+        })
+      } catch {}
+    }
     return false
   }
 }
@@ -157,20 +184,36 @@ export async function setupDynamicRules() {
 /**
  * Ensures rules are installed and active. If another part of the extension
  * modified or cleared dynamic rules, this safely re-installs ai-session-free's rules.
+ * Uses an in-flight promise mutex to prevent concurrent registration races and
+ * avoids redundant writes if rules 91001-91007 are already present.
+ *
+ * @param {(entry: object) => void} [onLog]
+ * @returns {Promise<void>}
  */
-export async function ensureDynamicRules() {
-  if (dynamicRulesDisabled) return
+export async function ensureDynamicRules(onLog) {
+  if (dynamicRulesDisabled || rulesInstalled) return
   if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest?.getDynamicRules) return
 
-  try {
-    const existing = await chrome.declarativeNetRequest.getDynamicRules()
-    const hasOurRules = existing.some((r) => r.id >= 91001 && r.id <= 91007)
-    if (!hasOurRules) {
-      await setupDynamicRules()
-    }
-  } catch {
-    if (!rulesInstalled) {
-      await setupDynamicRules()
-    }
+  if (initPromise) {
+    return initPromise
   }
+
+  initPromise = (async () => {
+    try {
+      const existing = await chrome.declarativeNetRequest.getDynamicRules()
+      const hasAllRules = NET_RULES.every((r) => existing.some((e) => e.id === r.id))
+
+      if (hasAllRules) {
+        rulesInstalled = true
+        return
+      }
+      await setupDynamicRules(onLog)
+    } catch {
+      await setupDynamicRules(onLog)
+    } finally {
+      initPromise = null
+    }
+  })()
+
+  return initPromise
 }

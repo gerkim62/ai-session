@@ -19,6 +19,7 @@
 import { fetchSSE } from '../utils/sse-parser.js'
 import { createLogger } from '../utils/log.js'
 import { assertOk, createHttpError } from '../utils/http.js'
+import { ensureDynamicRules } from '../utils/rules.js'
 
 export const metadata = {
   id: 'kimi',
@@ -310,6 +311,7 @@ async function deleteConversation(conversationId, accessToken, origin = 'https:/
  * @returns {Promise<{ authenticated: boolean, loginUrl: string, reason?: string }>}
  */
 export async function checkAuth({ mode = 'cookie', signal, onLog, token } = {}) {
+  await ensureDynamicRules(onLog)
   try {
     log(onLog, 'debug', 'STORAGE', 'Checking Kimi auth status in chrome.storage.local')
     const { refreshToken, accessToken, origin } = await getStoredTokens()
@@ -372,6 +374,7 @@ export async function sendPrompt(
     token,
   } = {},
 ) {
+  await ensureDynamicRules(onLog)
   log(onLog, 'info', 'PROMPT_START', 'Starting Kimi prompt execution', { prompt })
 
   const { accessToken, origin } = await getValidAccessToken({ token, signal, onLog })

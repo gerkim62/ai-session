@@ -20,6 +20,7 @@ import { fetchSSE } from '../utils/sse-parser.js'
 import { createLogger } from '../utils/log.js'
 import { generateUUID } from '../utils/crypto.js'
 import { buildCookieString, createHttpError } from '../utils/http.js'
+import { ensureDynamicRules } from '../utils/rules.js'
 
 export const metadata = {
   id: 'chatgpt',
@@ -201,6 +202,7 @@ function cleanChatGPTText(text) {
  * @returns {Promise<string>} final answer text
  */
 export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
+  await ensureDynamicRules(onLog)
   log(onLog, 'info', 'PROMPT_START', 'Starting ChatGPT prompt execution', { prompt })
 
   try {
@@ -343,6 +345,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
  * @returns {Promise<{ authenticated: boolean, loginUrl: string, challengeUrl?: string, reason?: string, metadata?: import('../index.js').ProviderMetadata }>}
  */
 export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
+  await ensureDynamicRules(onLog)
   try {
     const cookies = await chrome.cookies.getAll({ url: 'https://chatgpt.com/' })
     log(onLog, 'debug', 'COOKIE', 'checkAuth: retrieved cookies for https://chatgpt.com/', cookies)

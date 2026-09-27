@@ -146,12 +146,12 @@ export const NET_RULES: Array<any>;
 /**
  * Automatically registers or refreshes dynamic declarativeNetRequest rules in Chrome MV3.
  */
-export function setupDynamicRules(): Promise<boolean>;
+export function setupDynamicRules(onLog?: (entry: any) => void): Promise<boolean>;
 
 /**
  * Ensures dynamic rules are installed once in the current background session.
  */
-export function ensureDynamicRules(): Promise<void>;
+export function ensureDynamicRules(onLog?: (entry: any) => void): Promise<void>;
 
 /**
  * Opt-out: disable automatic dynamic rule registration if the host extension

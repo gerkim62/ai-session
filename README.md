@@ -34,10 +34,9 @@ ai-session-free/
 │       └── sse-parser.js     # SSE streaming fetch helper (powered by eventsource-parser)
 └── sample-extension/         # Working sample Chrome Extension (Vite)
     ├── package.json          # Depends on "ai-session-free": "workspace:*"
-    ├── vite.config.js        # Vite build config (auto-copies rules.json from library)
+    ├── vite.config.js        # Vite build config
     ├── public/
-    │   ├── manifest.json     # Extension Manifest V3
-    │   └── content-scripts/  # Lightweight token bridges for Kimi and DeepSeek
+    │   └── manifest.json     # Extension Manifest V3 (no rules.json needed)
     │       ├── kimi-bridge.js
     │       └── deepseek-bridge.js
     ├── app.html              # UI dashboard for all 6 providers
@@ -187,7 +186,7 @@ Add the required permissions, host permissions, and WebAssembly CSP to your exte
   "permissions": [
     "cookies",
     "storage",
-    "declarativeNetRequestWithHostAccess"
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "https://*.chatgpt.com/*",
@@ -255,7 +254,7 @@ Register a content script targeting the Kimi and DeepSeek domains in your `manif
 
 To prevent CORS and browser origin blocks, requests to AI web endpoints require spoofed `Origin` and `Referer` headers.
 
-`ai-session-free` installs these rules automatically at runtime via `chrome.declarativeNetRequest.updateDynamicRules` whenever `checkSession()` or `sendPrompt()` runs in your background service worker.
+`ai-session-free` installs these rules automatically at runtime via `chrome.declarativeNetRequest.updateDynamicRules` whenever `checkSession()`, `sendPrompt()`, or direct provider functions (`ai-session-free/claude`, etc.) run in your background service worker. No manual configuration or static rulesets are required.
 
 #### Coexistence Guarantee with Your Extension's Rules:
 1. **Dedicated Isolated Rule IDs (`91001` – `91007`):** The library registers rules strictly in the `91001–91007` ID range. When refreshing, it passes `removeRuleIds: [91001...91007]` — **it never removes, modifies, or collides with any dynamic rules your extension creates**.

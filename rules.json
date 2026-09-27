@@ -5,12 +5,12 @@
       "type": "modifyHeaders",
       "requestHeaders": [
         { "operation": "set", "header": "origin", "value": "https://chatgpt.com" },
-        { "operation": "set", "header": "referer", "value": "https://chatgpt.com" }
+        { "operation": "set", "header": "referer", "value": "https://chatgpt.com/" }
       ]
     },
     "condition": {
       "requestDomains": ["chatgpt.com"],
-      "resourceTypes": ["xmlhttprequest"]
+      "resourceTypes": ["xmlhttprequest", "other"]
     }
   },
   {
@@ -19,12 +19,12 @@
       "type": "modifyHeaders",
       "requestHeaders": [
         { "operation": "set", "header": "origin", "value": "https://claude.ai" },
-        { "operation": "set", "header": "referer", "value": "https://claude.ai" }
+        { "operation": "set", "header": "referer", "value": "https://claude.ai/" }
       ]
     },
     "condition": {
       "requestDomains": ["claude.ai"],
-      "resourceTypes": ["xmlhttprequest"]
+      "resourceTypes": ["xmlhttprequest", "other"]
     }
   },
   {
@@ -33,12 +33,12 @@
       "type": "modifyHeaders",
       "requestHeaders": [
         { "operation": "set", "header": "origin", "value": "https://gemini.google.com" },
-        { "operation": "set", "header": "referer", "value": "https://gemini.google.com" }
+        { "operation": "set", "header": "referer", "value": "https://gemini.google.com/" }
       ]
     },
     "condition": {
       "requestDomains": ["gemini.google.com"],
-      "resourceTypes": ["xmlhttprequest"]
+      "resourceTypes": ["xmlhttprequest", "other"]
     }
   },
   {
@@ -52,7 +52,7 @@
     },
     "condition": {
       "requestDomains": ["kimi.ai", "www.kimi.ai"],
-      "resourceTypes": ["xmlhttprequest"]
+      "resourceTypes": ["xmlhttprequest", "other"]
     }
   },
   {
@@ -66,7 +66,7 @@
     },
     "condition": {
       "requestDomains": ["kimi.com", "kimi.moonshot.cn", "www.kimi.com"],
-      "resourceTypes": ["xmlhttprequest"]
+      "resourceTypes": ["xmlhttprequest", "other"]
     }
   },
   {
@@ -80,7 +80,7 @@
     },
     "condition": {
       "requestDomains": ["sydney.bing.com", "www.bing.com", "bing.com", "copilot.microsoft.com"],
-      "resourceTypes": ["xmlhttprequest", "websocket"]
+      "resourceTypes": ["xmlhttprequest", "websocket", "other"]
     }
   },
   {
@@ -94,7 +94,7 @@
     },
     "condition": {
       "requestDomains": ["chat.deepseek.com"],
-      "resourceTypes": ["xmlhttprequest"]
+      "resourceTypes": ["xmlhttprequest", "other"]
     }
   }
 ]

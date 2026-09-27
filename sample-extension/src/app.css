@@ -149,42 +149,179 @@ body {
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
 }
+.model-select-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.model-select-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.model-select-label::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-chatgpt);
+}
+
+.model-radio-group,
 .provider-toggles {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 14px;
 }
+.model-radio-option,
 .provider-toggle {
-  display: flex;
+  position: relative;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
   padding: 6px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: 20px;
   border: 1px solid var(--border);
   background: var(--bg-card);
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
 }
-.provider-toggle:hover { border-color: var(--text-dim); }
-.provider-toggle input { display: none; }
+.model-radio-option:hover,
+.provider-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.model-radio-option:active,
+.provider-toggle:active {
+  transform: translateY(0);
+}
+.model-radio-option input[type="radio"],
+.provider-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.model-radio-option .radio-indicator,
 .provider-toggle .dot {
-  width: 10px;
-  height: 10px;
+  position: relative;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   border: 2px solid var(--text-dim);
-  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  background: transparent;
 }
-.provider-toggle input:checked + .dot {
-  border-color: transparent;
+.model-radio-option .radio-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease;
 }
-.provider-toggle[data-provider="chatgpt"] input:checked + .dot { background: var(--accent-chatgpt); }
-.provider-toggle[data-provider="claude"] input:checked + .dot { background: var(--accent-claude); }
-.provider-toggle[data-provider="gemini"] input:checked + .dot { background: var(--accent-gemini); }
-.provider-toggle[data-provider="kimi"] input:checked + .dot { background: var(--accent-kimi); }
-.provider-toggle[data-provider="copilot"] input:checked + .dot { background: var(--accent-copilot); }
-.provider-toggle[data-provider="deepseek"] input:checked + .dot { background: var(--accent-deepseek); }
+.model-radio-option.selected,
+.model-radio-option:has(input:checked) {
+  color: #ffffff;
+  font-weight: 600;
+}
+.model-radio-option.selected .radio-dot,
+.model-radio-option:has(input:checked) .radio-dot {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* Provider-specific active states */
+.model-radio-option[data-provider="chatgpt"].selected,
+.model-radio-option[data-provider="chatgpt"]:has(input:checked) {
+  border-color: var(--accent-chatgpt);
+  background: var(--accent-chatgpt-bg);
+  box-shadow: 0 0 12px rgba(16, 163, 127, 0.25);
+}
+.model-radio-option[data-provider="chatgpt"].selected .radio-indicator,
+.model-radio-option[data-provider="chatgpt"]:has(input:checked) .radio-indicator {
+  border-color: var(--accent-chatgpt);
+  color: var(--accent-chatgpt);
+}
+
+.model-radio-option[data-provider="claude"].selected,
+.model-radio-option[data-provider="claude"]:has(input:checked) {
+  border-color: var(--accent-claude);
+  background: var(--accent-claude-bg);
+  box-shadow: 0 0 12px rgba(217, 119, 6, 0.25);
+}
+.model-radio-option[data-provider="claude"].selected .radio-indicator,
+.model-radio-option[data-provider="claude"]:has(input:checked) .radio-indicator {
+  border-color: var(--accent-claude);
+  color: var(--accent-claude);
+}
+
+.model-radio-option[data-provider="gemini"].selected,
+.model-radio-option[data-provider="gemini"]:has(input:checked) {
+  border-color: var(--accent-gemini);
+  background: var(--accent-gemini-bg);
+  box-shadow: 0 0 12px rgba(66, 133, 244, 0.25);
+}
+.model-radio-option[data-provider="gemini"].selected .radio-indicator,
+.model-radio-option[data-provider="gemini"]:has(input:checked) .radio-indicator {
+  border-color: var(--accent-gemini);
+  color: var(--accent-gemini);
+}
+
+.model-radio-option[data-provider="kimi"].selected,
+.model-radio-option[data-provider="kimi"]:has(input:checked) {
+  border-color: var(--accent-kimi);
+  background: var(--accent-kimi-bg);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+}
+.model-radio-option[data-provider="kimi"].selected .radio-indicator,
+.model-radio-option[data-provider="kimi"]:has(input:checked) .radio-indicator {
+  border-color: var(--accent-kimi);
+  color: var(--accent-kimi);
+}
+
+.model-radio-option[data-provider="copilot"].selected,
+.model-radio-option[data-provider="copilot"]:has(input:checked) {
+  border-color: var(--accent-copilot);
+  background: var(--accent-copilot-bg);
+  box-shadow: 0 0 12px rgba(0, 120, 212, 0.25);
+}
+.model-radio-option[data-provider="copilot"].selected .radio-indicator,
+.model-radio-option[data-provider="copilot"]:has(input:checked) .radio-indicator {
+  border-color: var(--accent-copilot);
+  color: var(--accent-copilot);
+}
+
+.model-radio-option[data-provider="deepseek"].selected,
+.model-radio-option[data-provider="deepseek"]:has(input:checked) {
+  border-color: var(--accent-deepseek);
+  background: var(--accent-deepseek-bg);
+  box-shadow: 0 0 12px rgba(79, 70, 229, 0.25);
+}
+.model-radio-option[data-provider="deepseek"].selected .radio-indicator,
+.model-radio-option[data-provider="deepseek"]:has(input:checked) .radio-indicator {
+  border-color: var(--accent-deepseek);
+  color: var(--accent-deepseek);
+}
 
 .prompt-row {
   display: flex;

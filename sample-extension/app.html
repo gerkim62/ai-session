@@ -16,8 +16,11 @@
   </div>
 
   <div class="input-area">
-    <!-- Provider toggles rendered dynamically from library metadata -->
-    <div class="provider-toggles" id="provider-toggles"></div>
+    <div class="model-select-header">
+      <span class="model-select-label">Select AI Model</span>
+    </div>
+    <!-- Model selection radio group rendered dynamically from library metadata -->
+    <div class="model-radio-group provider-toggles" id="provider-toggles" role="radiogroup" aria-label="Select AI Model"></div>
     <div class="prompt-row">
       <textarea id="prompt-input" placeholder="Type your prompt here..." rows="2"></textarea>
       <button class="btn btn-send" id="btn-send">Send</button>

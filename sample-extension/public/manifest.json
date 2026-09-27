@@ -5,7 +5,7 @@
   "manifest_version": 3,
   "permissions": [
     "cookies",
-    "declarativeNetRequestWithHostAccess",
+    "declarativeNetRequest",
     "storage"
   ],
   "host_permissions": [

@@ -19,6 +19,7 @@
 
 import { createLogger } from '../utils/log.js'
 import { assertOk, createHttpError } from '../utils/http.js'
+import { ensureDynamicRules } from '../utils/rules.js'
 
 export const metadata = {
   id: 'gemini',
@@ -203,6 +204,7 @@ function cleanGeminiText(text) {
  * @returns {Promise<string>} answer text
  */
 export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
+  await ensureDynamicRules(onLog)
   log(onLog, 'info', 'PROMPT_START', 'Starting Gemini prompt execution', { prompt })
 
   try {
@@ -289,6 +291,7 @@ export async function sendPrompt(prompt, { onChunk, signal, onLog } = {}) {
  * @returns {Promise<{ authenticated: boolean, loginUrl: string, challengeUrl?: string, reason?: string, metadata?: import('../index.js').ProviderMetadata }>}
  */
 export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
+  await ensureDynamicRules(onLog)
   try {
     const psid = await chrome.cookies.get({
       url: 'https://gemini.google.com/',

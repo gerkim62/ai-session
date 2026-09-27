@@ -107,7 +107,7 @@ export async function checkSession({
   signal,
   onLog,
 } = {}) {
-  await ensureDynamicRules()
+  await ensureDynamicRules(onLog)
   validateManifest()
   const entries = await Promise.all(
     targetProviders.map(async (name) => {
@@ -156,7 +156,7 @@ export async function checkSession({
  * @returns {Promise<string>}
  */
 export async function sendPrompt(providerName, prompt, { onChunk, signal, onLog, ...rest } = {}) {
-  await ensureDynamicRules()
+  await ensureDynamicRules(onLog)
   validateManifest(providerName)
   const provider = getProvider(providerName)
   try {

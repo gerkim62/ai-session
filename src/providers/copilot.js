@@ -17,6 +17,7 @@
 import { createLogger } from '../utils/log.js'
 import { generateUUID } from '../utils/crypto.js'
 import { buildCookieString, assertOk, createHttpError } from '../utils/http.js'
+import { ensureDynamicRules } from '../utils/rules.js'
 
 export const metadata = {
   id: 'copilot',
@@ -140,6 +141,7 @@ async function createConversation(cookieStr, { signal, onLog } = {}) {
  * @returns {Promise<{ authenticated: boolean, loginUrl: string, reason?: string }>}
  */
 export async function checkAuth({ mode = 'cookie', signal, onLog } = {}) {
+  await ensureDynamicRules(onLog)
   try {
     const { cookieStr } = await getBingCookies(onLog)
 
@@ -178,6 +180,7 @@ export async function sendPrompt(
     tone = 'Balanced',
   } = {},
 ) {
+  await ensureDynamicRules(onLog)
   log(onLog, 'info', 'PROMPT_START', 'Starting Copilot prompt execution', { prompt, tone })
 
   const { cookieStr } = await getBingCookies(onLog)

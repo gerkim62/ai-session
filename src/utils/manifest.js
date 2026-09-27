@@ -6,7 +6,7 @@
 export const REQUIRED_PERMISSIONS = [
   'cookies',
   'storage',
-  'declarativeNetRequestWithHostAccess',
+  'declarativeNetRequest',
 ]
 
 export const PROVIDER_HOST_PERMISSIONS = {
